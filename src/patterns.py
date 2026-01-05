@@ -112,84 +112,84 @@ def detect_candlestick_patterns(df):
         pattern_type = None
         signal = None
         
-        # 1. Doji Pattern (Indecision)
-        if body_ratio < 0.1 and total_range > 0:
-            detected_pattern = "Doji"
-            pattern_type = "Indecision"
-            signal = "Neutral"
-        
-        # 2. Hammer (Bullish Reversal)
-        elif (lower_shadow > 2 * body and 
-              upper_shadow < body * 0.3 and 
-              close_price > open_price * 0.95):
-            detected_pattern = "Hammer"
-            pattern_type = "Bullish Reversal"
-            signal = "Bullish"
-        
-        # 3. Shooting Star (Bearish Reversal)
-        elif (upper_shadow > 2 * body and 
-              lower_shadow < body * 0.3 and 
-              close_price < open_price * 1.05):
-            detected_pattern = "Shooting Star"
-            pattern_type = "Bearish Reversal"
-            signal = "Bearish"
-        
-        # 4. Bullish Engulfing
-        elif (prev_close < prev_open and  # Previous was bearish
-              close_price > open_price and  # Current is bullish
-              open_price < prev_close and  # Current opens below prev close
-              close_price > prev_open):  # Current closes above prev open
-            detected_pattern = "Bullish Engulfing"
-            pattern_type = "Bullish Reversal"
-            signal = "Bullish"
-        
-        # 5. Bearish Engulfing
-        elif (prev_close > prev_open and  # Previous was bullish
-              close_price < open_price and  # Current is bearish
-              open_price > prev_close and  # Current opens above prev close
-              close_price < prev_open):  # Current closes below prev open
-            detected_pattern = "Bearish Engulfing"
-            pattern_type = "Bearish Reversal"
-            signal = "Bearish"
-        
-        # 6. Marubozu (Strong Trend)
-        elif body_ratio > 0.9:
-            if close_price > open_price:
-                detected_pattern = "Bullish Marubozu"
-                pattern_type = "Strong Bullish"
-                signal = "Bullish"
-            else:
-                detected_pattern = "Bearish Marubozu"
-                pattern_type = "Strong Bearish"
-                signal = "Bearish"
-        
-        # 7. Morning Star (if we have 3 candles)
+        # Check 3-candle patterns first (they have priority)
         if i >= 2:
             prev_prev_row = df_sorted.iloc[i-2]
             prev_prev_open = float(prev_prev_row["Open"])
             prev_prev_close = float(prev_prev_row["Close"])
+            prev_prev_body = abs(prev_prev_close - prev_prev_open)
+            prev_body = abs(prev_close - prev_open)
             
+            # 7. Morning Star (3-candle pattern - highest priority)
             if (prev_prev_close < prev_prev_open and  # First candle bearish
-                prev_close < prev_open and  # Second candle bearish (small body)
+                prev_body < prev_prev_body * 0.5 and  # Second candle has small body (star)
                 close_price > open_price and  # Third candle bullish
                 close_price > (prev_prev_open + prev_prev_close) / 2):  # Closes above midpoint
                 detected_pattern = "Morning Star"
                 pattern_type = "Bullish Reversal"
                 signal = "Bullish"
-        
-        # 8. Evening Star (if we have 3 candles)
-        if i >= 2:
-            prev_prev_row = df_sorted.iloc[i-2]
-            prev_prev_open = float(prev_prev_row["Open"])
-            prev_prev_close = float(prev_prev_row["Close"])
             
-            if (prev_prev_close > prev_prev_open and  # First candle bullish
-                prev_close > prev_open and  # Second candle bullish (small body)
-                close_price < open_price and  # Third candle bearish
-                close_price < (prev_prev_open + prev_prev_close) / 2):  # Closes below midpoint
+            # 8. Evening Star (3-candle pattern - highest priority)
+            elif (prev_prev_close > prev_prev_open and  # First candle bullish
+                  prev_body < prev_prev_body * 0.5 and  # Second candle has small body (star)
+                  close_price < open_price and  # Third candle bearish
+                  close_price < (prev_prev_open + prev_prev_close) / 2):  # Closes below midpoint
                 detected_pattern = "Evening Star"
                 pattern_type = "Bearish Reversal"
                 signal = "Bearish"
+        
+        # Check 2-candle patterns (engulfing patterns)
+        if detected_pattern is None:
+            # 4. Bullish Engulfing
+            if (prev_close < prev_open and  # Previous was bearish
+                close_price > open_price and  # Current is bullish
+                open_price < prev_close and  # Current opens below prev close
+                close_price > prev_open):  # Current closes above prev open
+                detected_pattern = "Bullish Engulfing"
+                pattern_type = "Bullish Reversal"
+                signal = "Bullish"
+            
+            # 5. Bearish Engulfing
+            elif (prev_close > prev_open and  # Previous was bullish
+                  close_price < open_price and  # Current is bearish
+                  open_price > prev_close and  # Current opens above prev close
+                  close_price < prev_open):  # Current closes below prev open
+                detected_pattern = "Bearish Engulfing"
+                pattern_type = "Bearish Reversal"
+                signal = "Bearish"
+        
+        # Check single-candle patterns
+        if detected_pattern is None:
+            # 1. Doji Pattern (Indecision) - very small body
+            if body_ratio < 0.1 and total_range > 0:
+                detected_pattern = "Doji"
+                pattern_type = "Indecision"
+                signal = "Neutral"
+            
+            # 2. Hammer (Bullish Reversal) - long lower shadow, small upper shadow
+            elif (body > 0 and lower_shadow >= 2 * body and 
+                  upper_shadow <= body * 0.5):
+                detected_pattern = "Hammer"
+                pattern_type = "Bullish Reversal"
+                signal = "Bullish"
+            
+            # 3. Shooting Star (Bearish Reversal) - long upper shadow, small lower shadow
+            elif (body > 0 and upper_shadow >= 2 * body and 
+                  lower_shadow <= body * 0.5):
+                detected_pattern = "Shooting Star"
+                pattern_type = "Bearish Reversal"
+                signal = "Bearish"
+            
+            # 6. Marubozu (Strong Trend) - very large body, minimal shadows
+            elif body_ratio > 0.9:
+                if close_price > open_price:
+                    detected_pattern = "Bullish Marubozu"
+                    pattern_type = "Strong Bullish"
+                    signal = "Bullish"
+                else:
+                    detected_pattern = "Bearish Marubozu"
+                    pattern_type = "Strong Bearish"
+                    signal = "Bearish"
         
         if detected_pattern:
             patterns.append({

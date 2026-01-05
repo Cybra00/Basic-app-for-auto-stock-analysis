@@ -31,7 +31,16 @@ except Exception as e:
 # --- Auto Analysis Pipeline ---
 df = add_indicators(df)
 kpis = compute_kpis(df)
-patterns_df = detect_candlestick_patterns(df)
+
+# Detect patterns with error handling
+try:
+    patterns_df = detect_candlestick_patterns(df)
+    # Debug: Show pattern count in sidebar
+    with st.sidebar:
+        st.write(f"**Patterns Detected**: {len(patterns_df)}")
+except Exception as e:
+    st.error(f"Error detecting patterns: {str(e)}")
+    patterns_df = pd.DataFrame(columns=["Date", "Pattern", "Type", "Signal", "Price"])
 
 # --- KPI Cards ---
 col1, col2, col3, col4 = st.columns(4)
@@ -48,7 +57,24 @@ st.plotly_chart(volume_chart(df), use_container_width=True)
 # --- Candlestick Pattern Detection ---
 st.subheader("🕯️ Candlestick Pattern Detection & Analysis")
 
-if not patterns_df.empty:
+# Always show pattern detection status
+if patterns_df.empty:
+    st.warning("⚠️ No candlestick patterns detected in the current data.")
+    st.info("💡 **Tips to see patterns:**\n"
+            "- Ensure your CSV has sufficient data (at least 20+ rows)\n"
+            "- Patterns are detected based on OHLC relationships\n"
+            "- Try uploading a different stock data file\n"
+            "- Some patterns require specific market conditions")
+    
+    # Show data summary for debugging
+    with st.expander("🔍 Data Summary (Debug)", expanded=False):
+        st.write(f"**Total Rows**: {len(df)}")
+        st.write(f"**Date Range**: {df['Date'].min()} to {df['Date'].max()}")
+        st.write(f"**Columns**: {', '.join(df.columns.tolist())}")
+        if len(df) > 0:
+            st.write("**Sample Data (First 5 rows):**")
+            st.dataframe(df[["Date", "Open", "High", "Low", "Close"]].head(), use_container_width=True)
+else:
     # Get comprehensive insights
     insights = get_pattern_insights(patterns_df, df)
     
@@ -133,9 +159,6 @@ if not patterns_df.empty:
             st.write(f"**Meaning**: {pattern_info['meaning']}")
             st.write(f"**Reliability**: {pattern_info['reliability']}")
             st.divider()
-    
-else:
-    st.info("No candlestick patterns detected in the data. Patterns may appear as more data is analyzed.")
 
 # --- Insight ---
 st.subheader("📌 Auto Insight")
