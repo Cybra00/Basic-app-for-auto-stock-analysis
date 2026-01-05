@@ -234,14 +234,45 @@ def get_pattern_insights(patterns_df, df):
     bearish_count = len(recent_patterns[recent_patterns["Signal"] == "Bearish"])
     neutral_count = len(recent_patterns[recent_patterns["Signal"] == "Neutral"])
     
-    # Overall sentiment
-    if bullish_count > bearish_count * 1.5:
+    # --- Sentiment Analysis & Logic Optimization ---
+    # Calculate Base Score from Pattern Counts
+    sentiment_score = 0
+    sentiment_score += bullish_count * 1  # Base value for bullish patterns
+    sentiment_score -= bearish_count * 1  # Base value for bearish patterns
+    
+    # --- Integration of Trend (Optimization) ---
+    # We check if the price is above or below the 50-day Moving Average (MA50)
+    # If MA50 is not pre-calculated, we calculate it on the fly.
+    
+    latest_close = df.iloc[-1]["Close"]
+    
+    # Safe check for MA50
+    if "MA50" in df.columns:
+        ma_50 = df.iloc[-1]["MA50"]
+    else:
+        # Calculate MA50 if missing
+        ma_50 = df["Close"].rolling(window=50).mean().iloc[-1]
+    
+    # If we have a valid MA, use it for trend context
+    trend = "Neutral"
+    if not pd.isna(ma_50):
+        if latest_close > ma_50:
+            trend = "Bullish"
+            # Trend Bonus: Easier to be bullish in an uptrend
+            sentiment_score += 2
+        else:
+            trend = "Bearish"
+            # Trend Penalty: Harder to be bullish in a downtrend
+            sentiment_score -= 2
+            
+    # --- Final Sentiment Classification ---
+    if sentiment_score >= 3:
         sentiment = "Strongly Bullish"
-    elif bullish_count > bearish_count:
+    elif sentiment_score > 0:
         sentiment = "Bullish"
-    elif bearish_count > bullish_count * 1.5:
+    elif sentiment_score <= -3:
         sentiment = "Strongly Bearish"
-    elif bearish_count > bullish_count:
+    elif sentiment_score < 0:
         sentiment = "Bearish"
     else:
         sentiment = "Mixed/Neutral"
