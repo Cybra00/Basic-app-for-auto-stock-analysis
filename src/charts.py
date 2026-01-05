@@ -84,63 +84,64 @@ def candlestick_chart(df, patterns_df=None, show_patterns=True):
     )
     
     # Add pattern annotations if provided and enabled
+    # Add pattern markers if provided and enabled
     if show_patterns and patterns_df is not None and not patterns_df.empty:
-        # Get recent patterns for annotation - INCREASED LIMIT for visibility
-        recent_patterns = patterns_df.tail(50)  # Increased from 15 to 50
+        # Get recent patterns from the same dataframe scope as the chart
+        recent_patterns = patterns_df[patterns_df['Date'].isin(df['Date'])]
         
-        annotations = []
-        for _, pattern in recent_patterns.iterrows():
-            date = pattern["Date"]
-            pattern_name = pattern["Pattern"]
-            signal = pattern["Signal"]
+        if not recent_patterns.empty:
+            # Separate patterns by signal for different markers
+            bullish_patterns = recent_patterns[recent_patterns['Signal'] == 'Bullish']
+            bearish_patterns = recent_patterns[recent_patterns['Signal'] == 'Bearish']
             
-            # Find the index in df for this date
-            date_mask = df["Date"] == date
-            if date_mask.any():
-                idx = df[date_mask].index[0]
-                high_price = df.iloc[idx]["High"]
-                low_price = df.iloc[idx]["Low"]
+            # Trace for Bullish Patterns (Green Up Triangles)
+            if not bullish_patterns.empty:
+                # Align prices with the main dataframe to get accurate High/Low
+                # We merge with df to get the Low price for positioning
+                bull_merged = bullish_patterns.merge(df[['Date', 'Low']], on='Date', how='left')
                 
-                # Color based on signal
-                if signal == "Bullish":
-                    color = "#00c853"  # Brighter green
-                    y_pos = low_price * 0.985  # Below the candle for bullish
-                    ay_offset = 40  # Arrow points UP
-                    symbol_arrow = 1  # Arrow pointing up
-                    anchor = "top"
-                elif signal == "Bearish":
-                    color = "#d50000"  # Brighter red
-                    y_pos = high_price * 1.015  # Above the candle for bearish
-                    ay_offset = 40  # Arrow points DOWN
-                    symbol_arrow = 5 # Arrow pointing down
-                    anchor = "bottom"
-                else:
-                    color = "#ffab00" # Amber
-                    y_pos = high_price * 1.015
-                    ay_offset = 40
-                    anchor = "bottom"
-                
-                # Create a more visible annotation
-                annotations.append(
-                    dict(
-                        x=date,
-                        y=y_pos,
-                        text=f"<b>{pattern_name}</b>",
-                        showarrow=True,
-                        arrowhead=2,
-                        arrowcolor=color,
-                        bgcolor="rgba(255, 255, 255, 0.7)", # Semi-transparent background
-                        bordercolor=color,
-                        borderwidth=2,
-                        font=dict(color="black", size=11, family="Arial Black"),
-                        arrowwidth=2.5,  # Thicker arrow
-                        arrowsize=1.5,   # Larger arrow head
-                        ax=0,
-                        ay=-ay_offset if signal == "Bullish" else -ay_offset # Adjust based on position
-                    )
+                fig.add_trace(
+                    go.Scatter(
+                        x=bull_merged['Date'],
+                        y=bull_merged['Low'] * 0.99, # Slightly below low
+                        mode='markers',
+                        name='Bullish Patterns',
+                        marker=dict(
+                            symbol='triangle-up',
+                            size=12,
+                            color='#00c853',
+                            line=dict(width=1, color='white')
+                        ),
+                        text=bull_merged['Pattern'],
+                        customdata=bull_merged['Signal'],
+                        hovertemplate="<b>%{text}</b><br>Signal: %{customdata}<extra></extra>"
+                    ),
+                    row=1, col=1
                 )
-        
-        fig.update_layout(annotations=annotations)
+
+            # Trace for Bearish Patterns (Red Down Triangles)
+            if not bearish_patterns.empty:
+                # Merge to get High price for positioning
+                bear_merged = bearish_patterns.merge(df[['Date', 'High']], on='Date', how='left')
+                
+                fig.add_trace(
+                    go.Scatter(
+                        x=bear_merged['Date'],
+                        y=bear_merged['High'] * 1.01, # Slightly above high
+                        mode='markers',
+                        name='Bearish Patterns',
+                        marker=dict(
+                            symbol='triangle-down',
+                            size=12,
+                            color='#d50000',
+                            line=dict(width=1, color='white')
+                        ),
+                        text=bear_merged['Pattern'],
+                        customdata=bear_merged['Signal'],
+                        hovertemplate="<b>%{text}</b><br>Signal: %{customdata}<extra></extra>"
+                    ),
+                    row=1, col=1
+                )
     
     # Update layout for better visibility
     fig.update_layout(
@@ -213,6 +214,9 @@ def candlestick_chart(df, patterns_df=None, show_patterns=True):
         "Close: %{close:,.2f}<extra></extra>"
     )
     
+    # Ensure X-axis label is visible
+    fig.update_xaxes(title_text="Date", row=2, col=1)
+
     return fig
 
 def volume_chart(df):
