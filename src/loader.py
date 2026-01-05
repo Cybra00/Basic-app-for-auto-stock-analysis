@@ -14,8 +14,21 @@ def load_stock_data(file):
     if missing:
         raise ValueError(f"CSV missing columns: {missing}")
 
-    # Data cleaning
+    # Data cleaning & Type Enforcement
     df["Date"] = pd.to_datetime(df["Date"])
+    
+    # Force numeric columns to be floats, coercing errors to NaN
+    numeric_cols = ["Open", "High", "Low", "Close", "Volume"]
+    for col in numeric_cols:
+        df[col] = pd.to_numeric(df[col], errors='coerce')
+        
+    # Drop rows with missing values in essential columns
+    df = df.dropna(subset=REQUIRED_COLUMNS)
+    
+    # Sort and reset
     df = df.sort_values("Date").reset_index(drop=True)
+    
+    if df.empty:
+        raise ValueError("CSV contains no valid stock data after cleaning.")
 
     return df
