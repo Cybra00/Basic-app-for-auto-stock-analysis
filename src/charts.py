@@ -174,7 +174,6 @@ def candlestick_chart(df, patterns_df=None, show_patterns=True):
             spikecolor="grey",
             spikesnap="cursor",
             spikemode="across",
-            spikemode="across",
             spikethickness=1,
             title_font=dict(color="black"),
             tickfont=dict(color="black")
