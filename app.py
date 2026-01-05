@@ -128,7 +128,7 @@ else:
         st.bar_chart(pattern_freq_df.set_index("Pattern"))
     
     # Display latest pattern details with description
-    if insights["latest_pattern"]:
+    if insights["latest_pattern"] is not None:
         st.write("### 🎯 Latest Pattern Details")
         latest = insights["latest_pattern"]
         pattern_name = latest["Pattern"]
