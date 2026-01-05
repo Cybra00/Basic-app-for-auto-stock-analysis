@@ -35,7 +35,8 @@ def candlestick_chart(df, patterns_df=None, show_patterns=True):
             increasing_fillcolor='#26a69a',
             decreasing_fillcolor='#ef5350',
             line=dict(width=1.5),
-            whiskerwidth=0.8
+            whiskerwidth=0.8,
+            
         ),
         row=1, col=1
     )
@@ -173,19 +174,26 @@ def candlestick_chart(df, patterns_df=None, show_patterns=True):
             spikecolor="grey",
             spikesnap="cursor",
             spikemode="across",
-            spikethickness=1
+            spikemode="across",
+            spikethickness=1,
+            title_font=dict(color="black"),
+            tickfont=dict(color="black")
         ),
         yaxis=dict(
             title="Price",
             showgrid=True,
             gridcolor='rgba(128,128,128,0.2)',
-            side="right"
+            side="right",
+            title_font=dict(color="black"),
+            tickfont=dict(color="black")
         ),
         yaxis2=dict(
             title="Volume",
             showgrid=True,
             gridcolor='rgba(128,128,128,0.1)',
-            side="right"
+            side="right",
+            title_font=dict(color="black"),
+            tickfont=dict(color="black")
         )
     )
     
@@ -215,7 +223,8 @@ def candlestick_chart(df, patterns_df=None, show_patterns=True):
     )
     
     # Ensure X-axis label is visible
-    fig.update_xaxes(title_text="Date", row=2, col=1)
+    # Ensure X-axis label is visible
+    fig.update_xaxes(title_text="Date", title_font=dict(color="black"), tickfont=dict(color="black"), row=2, col=1)
 
     return fig
 
