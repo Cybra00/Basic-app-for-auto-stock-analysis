@@ -9,7 +9,7 @@ from src.patterns import detect_candlestick_patterns, get_pattern_insights, get_
 
 st.set_page_config(page_title="Stock Auto Analysis", layout="wide")
 
-st.title("📈 Stock KPI Auto-Analysis Dashboard")
+st.title("📈 Stock KPI Auto-Analysis Dashboard (v2.0)")
 
 # --- CSV Upload ---
 uploaded_file = st.sidebar.file_uploader(
