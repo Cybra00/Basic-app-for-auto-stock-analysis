@@ -3,13 +3,14 @@ import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
 
-def candlestick_chart(df, patterns_df=None):
+def candlestick_chart(df, patterns_df=None, show_patterns=True):
     """
     Create optimized candlestick chart with moving averages, volume, and pattern annotations.
     
     Args:
         df: DataFrame with OHLCV data and indicators (MA20, MA50)
         patterns_df: Optional DataFrame with detected patterns
+        show_patterns: Boolean to toggle pattern annotations (default: True)
     """
     # Create subplots: candlestick on top, volume on bottom
     fig = make_subplots(
@@ -82,10 +83,10 @@ def candlestick_chart(df, patterns_df=None):
         row=2, col=1
     )
     
-    # Add pattern annotations if provided
-    if patterns_df is not None and not patterns_df.empty:
-        # Get recent patterns for annotation (limit to avoid clutter)
-        recent_patterns = patterns_df.tail(15)  # Last 15 patterns
+    # Add pattern annotations if provided and enabled
+    if show_patterns and patterns_df is not None and not patterns_df.empty:
+        # Get recent patterns for annotation - INCREASED LIMIT for visibility
+        recent_patterns = patterns_df.tail(50)  # Increased from 15 to 50
         
         annotations = []
         for _, pattern in recent_patterns.iterrows():
@@ -97,16 +98,29 @@ def candlestick_chart(df, patterns_df=None):
             date_mask = df["Date"] == date
             if date_mask.any():
                 idx = df[date_mask].index[0]
-                y_pos = df.iloc[idx]["High"] * 1.015  # Slightly above the high
+                high_price = df.iloc[idx]["High"]
+                low_price = df.iloc[idx]["Low"]
                 
                 # Color based on signal
                 if signal == "Bullish":
-                    color = "#26a69a"
+                    color = "#00c853"  # Brighter green
+                    y_pos = low_price * 0.985  # Below the candle for bullish
+                    ay_offset = 40  # Arrow points UP
+                    symbol_arrow = 1  # Arrow pointing up
+                    anchor = "top"
                 elif signal == "Bearish":
-                    color = "#ef5350"
+                    color = "#d50000"  # Brighter red
+                    y_pos = high_price * 1.015  # Above the candle for bearish
+                    ay_offset = 40  # Arrow points DOWN
+                    symbol_arrow = 5 # Arrow pointing down
+                    anchor = "bottom"
                 else:
-                    color = "#757575"
+                    color = "#ffab00" # Amber
+                    y_pos = high_price * 1.015
+                    ay_offset = 40
+                    anchor = "bottom"
                 
+                # Create a more visible annotation
                 annotations.append(
                     dict(
                         x=date,
@@ -115,13 +129,14 @@ def candlestick_chart(df, patterns_df=None):
                         showarrow=True,
                         arrowhead=2,
                         arrowcolor=color,
-                        bgcolor=color,
+                        bgcolor="rgba(255, 255, 255, 0.7)", # Semi-transparent background
                         bordercolor=color,
-                        font=dict(color="white", size=10, family="Arial Black"),
-                        arrowwidth=2,
-                        arrowsize=1.2,
+                        borderwidth=2,
+                        font=dict(color="black", size=11, family="Arial Black"),
+                        arrowwidth=2.5,  # Thicker arrow
+                        arrowsize=1.5,   # Larger arrow head
                         ax=0,
-                        ay=-30
+                        ay=-ay_offset if signal == "Bullish" else -ay_offset # Adjust based on position
                     )
                 )
         
