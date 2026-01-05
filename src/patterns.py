@@ -254,7 +254,7 @@ def get_pattern_insights(patterns_df, df):
     
     # Generate recommendations
     recommendations = []
-    if latest_pattern:
+    if latest_pattern is not None:
         pattern_name = latest_pattern['Pattern']
         if pattern_name in PATTERN_DESCRIPTIONS:
             desc = PATTERN_DESCRIPTIONS[pattern_name]
@@ -274,7 +274,7 @@ def get_pattern_insights(patterns_df, df):
         summary_parts.append(f"**Market Sentiment**: {sentiment}")
         summary_parts.append(f"Detected {bullish_count} bullish, {bearish_count} bearish, and {neutral_count} neutral patterns in recent data.")
     
-    if latest_pattern:
+    if latest_pattern is not None:
         summary_parts.append(f"**Latest Pattern**: {latest_pattern['Pattern']} on {latest_pattern['Date'].strftime('%Y-%m-%d')} at ₹{latest_pattern['Price']:.2f}")
     
     return {
