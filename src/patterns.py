@@ -289,11 +289,26 @@ def get_pattern_insights(patterns_df, df):
         pattern_name = latest_pattern['Pattern']
         if pattern_name in PATTERN_DESCRIPTIONS:
             desc = PATTERN_DESCRIPTIONS[pattern_name]
+            # context-aware recommendation logic
+            action = "Watch for confirmation"
+            signal = latest_pattern['Signal']
+            
+            if signal == 'Neutral':
+                action = "Watch for confirmation (Neutral Pattern)"
+            elif signal == 'Bullish':
+                if trend == 'Bullish':
+                    action = "✅ Strong Buy: Pattern confirms Uptrend"
+                else:
+                    action = "⚠️ Caution: Bullish pattern in Downtrend (Counter-trend risk)"
+            elif signal == 'Bearish':
+                if trend == 'Bearish':
+                    action = "✅ Strong Sell: Pattern confirms Downtrend"
+                else:
+                    action = "⚠️ Caution: Bearish pattern in Uptrend (Potential Pullback)"
+            
             recommendations.append({
                 "pattern": pattern_name,
-                "action": "Watch for confirmation" if latest_pattern['Signal'] == 'Neutral' 
-                         else "Consider buying opportunity" if latest_pattern['Signal'] == 'Bullish'
-                         else "Consider selling/caution",
+                "action": action,
                 "description": desc["description"],
                 "meaning": desc["meaning"],
                 "reliability": desc["reliability"]
