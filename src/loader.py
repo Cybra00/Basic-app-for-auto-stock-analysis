@@ -22,9 +22,6 @@ def load_stock_data(file):
     for col in numeric_cols:
         df[col] = pd.to_numeric(df[col], errors='coerce')
         
-    # Drop rows with missing values in essential columns
-    df = df.dropna(subset=REQUIRED_COLUMNS)
-    
     # Sort and reset
     df = df.sort_values("Date").reset_index(drop=True)
     
