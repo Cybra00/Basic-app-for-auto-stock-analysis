@@ -105,11 +105,7 @@ except Exception as e:
     patterns_df = pd.DataFrame(columns=["Date", "Pattern", "Type", "Signal", "Price", "Status"])
     st.error(f"Error detecting patterns: {str(e)}")
 
-# --- Show Pattern Status Prominently ---
-if not patterns_df.empty:
-    st.success(f"✅ **{len(patterns_df)} Patterns Detected**")
-else:
-    st.info("ℹ️ No patterns detected in this dataset")
+
 
 # --- KPI Cards ---
 col1, col2, col3, col4 = st.columns(4)
@@ -118,16 +114,11 @@ col2.metric("Daily Return", f"{kpis['daily_return_pct']:.2f}%")
 col3.metric("52W High", f"₹{kpis['high_52w']:.2f}")
 col4.metric("Volatility", f"{kpis['volatility_pct']:.2f}%")
 
-# --- Charts ---
-# Add toggle for patterns
-show_patterns = st.checkbox("Show Patterns on Chart", value=True, help="Toggle to show/hide candlestick pattern markers")
-
-st.plotly_chart(candlestick_chart(df, patterns_df, show_patterns=show_patterns), use_container_width=True)
-st.plotly_chart(close_trend(df), use_container_width=True)
-st.plotly_chart(volume_chart(df), use_container_width=True)
-
 # --- Candlestick Pattern Detection ---
 st.subheader("🕯️ Candlestick Pattern Detection & Analysis")
+
+if not patterns_df.empty:
+    st.success(f"✅ **{len(patterns_df)} Patterns Detected**")
 
 # Always show pattern detection status
 if patterns_df.empty:
@@ -240,6 +231,14 @@ elif kpis["daily_return_pct"] < 0:
     st.warning("Stock closed lower – short-term weakness.")
 else:
     st.info("Stock is consolidating.")
+
+# --- Charts ---
+# Add toggle for patterns
+show_patterns = st.checkbox("Show Patterns on Chart", value=True, help="Toggle to show/hide candlestick pattern markers")
+
+st.plotly_chart(candlestick_chart(df, patterns_df, show_patterns=show_patterns), use_container_width=True)
+st.plotly_chart(close_trend(df), use_container_width=True)
+st.plotly_chart(volume_chart(df), use_container_width=True)
 
 # Auto-refresh logic moved to end
 if "auto_refresh" in locals() and auto_refresh:
