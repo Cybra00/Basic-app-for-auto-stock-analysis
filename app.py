@@ -46,7 +46,7 @@ else: # Live Ticker
                 st.warning(warning_msg)
             
             if df.empty:
-                st.error("No data found. Check ticker symbol.")
+                st.error(f"No data found for {ticker} with {interval} interval. Try using a larger interval (e.g., 5m, 15m) or checking the ticker symbol.")
                 st.stop()
                 
             st.success(f"Fetched {len(df)} rows for {ticker}")
