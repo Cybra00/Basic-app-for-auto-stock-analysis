@@ -31,14 +31,14 @@ def fetch_live_data(ticker, period="1mo", interval="1d"):
                  period = "2y"
                  warning_msg = f"⚠️ Limit reached: 1h data is restricted to last 730 days. Adjusted '{original_period}' to '2y'."
         
-        # Download data
-        df = yf.download(ticker, period=period, interval=interval, progress=False)
+        # Download data using Ticker.history which is more reliable for single tickers and granular intervals
+        ticker_obj = yf.Ticker(ticker)
+        df = ticker_obj.history(period=period, interval=interval)
         
-        # Fallback logic for 1m data (often flaky for >1d even if technically supported)
+        # Fallback logic for 1m data
         if df.empty and interval == "1m" and period != "1d":
              fallback_period = "1d"
-             # Only try fallback if we aren't already on 1d
-             df = yf.download(ticker, period=fallback_period, interval=interval, progress=False)
+             df = ticker_obj.history(period=fallback_period, interval=interval)
              if not df.empty:
                  if warning_msg:
                      warning_msg += f" (Note: Adjusted period returned no data, fell back to '{fallback_period}' which worked.)"
@@ -51,14 +51,12 @@ def fetch_live_data(ticker, period="1mo", interval="1d"):
         # Reset index to make Date a column
         df = df.reset_index()
         
-        # Ensure column names are clean (Vectorized DataFrame from yf often has multi-index)
-        if isinstance(df.columns, pd.MultiIndex):
-            try:
-                # Try to drop the ticker level if it exists
-                df.columns = df.columns.droplevel(1) 
-            except:
-                # Fallback to get level 0 
-                df.columns = df.columns.get_level_values(0)
+        # Ticker.history returns clean columns (Open, High, Low, Close, Volume, Dividends, Stock Splits)
+        # No MultiIndex processing needed usually.
+        
+        # Standardize Date column name (yfinance returns 'Datetime' for intraday, 'Date' for daily)
+        if "Datetime" in df.columns:
+            df = df.rename(columns={"Datetime": "Date"})
             
         # Rename columns to match expected schema
         # yfinance columns are usually: Date, Open, High, Low, Close, Adj Close, Volume
