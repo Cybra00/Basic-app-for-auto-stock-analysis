@@ -67,6 +67,19 @@ def candlestick_chart(df, patterns_df=None, show_patterns=True):
             row=1, col=1
         )
     
+    # Add VWAP if available
+    if "VWAP" in df.columns:
+        fig.add_trace(
+            go.Scatter(
+                x=df["Date"],
+                y=df["VWAP"],
+                name="VWAP",
+                line=dict(color='#9c27b0', width=2, dash='dot'),
+                opacity=0.8
+            ),
+            row=1, col=1
+        )
+    
     # Add Volume bars with color based on price direction
     # More efficient: use vectorized operation
     volume_colors = ['#26a69a' if close >= open_price 
@@ -84,6 +97,19 @@ def candlestick_chart(df, patterns_df=None, show_patterns=True):
         ),
         row=2, col=1
     )
+    
+    # Add Volume MA if available
+    if "Volume_MA20" in df.columns:
+        fig.add_trace(
+            go.Scatter(
+                x=df["Date"],
+                y=df["Volume_MA20"],
+                name="Vol MA20",
+                line=dict(color='#ff9800', width=1.5),
+                opacity=0.8
+            ),
+            row=2, col=1
+        )
     
     # Add pattern annotations if provided and enabled
     # Add pattern markers if provided and enabled
@@ -234,6 +260,89 @@ def candlestick_chart(df, patterns_df=None, show_patterns=True):
     # Ensure X-axis label is visible
     fig.update_xaxes(title_text="Date", title_font=dict(color="black"), tickfont=dict(color="black"), row=2, col=1)
 
+    return fig
+
+def volume_analysis_chart(df):
+    """
+    Creates a dedicated volume analysis chart with MA20 and color-coded breakouts.
+    """
+    # Base volume bars
+    colors = ['#26a69a' if c >= o else '#ef5350' for c, o in zip(df['Close'], df['Open'])]
+    
+    # Highlight breakouts with a different border or distinct color if desired
+    # For now, we stick to red/green but maybe add a marker for 'Breakout'
+    
+    fig = go.Figure()
+    
+    # Volume Bars
+    fig.add_trace(go.Bar(
+        x=df['Date'],
+        y=df['Volume'],
+        name='Volume',
+        marker_color=colors,
+        opacity=0.6
+    ))
+    
+    # Volume MA
+    if "Volume_MA20" in df.columns:
+        fig.add_trace(go.Scatter(
+            x=df['Date'],
+            y=df['Volume_MA20'],
+            name='Vol MA (20)',
+            line=dict(color='#ffa726', width=2)
+        ))
+        
+    # Breakout Markers
+    if "Volume_Breakout" in df.columns:
+        breakouts = df[df["Volume_Breakout"]]
+        if not breakouts.empty:
+            fig.add_trace(go.Scatter(
+                x=breakouts['Date'],
+                y=breakouts['Volume'] * 1.05,
+                mode='markers',
+                name='High Vol Breakout',
+                marker=dict(symbol='star', size=10, color='purple')
+            ))
+
+    fig.update_layout(
+        title="<b>Volume Analysis & Breakouts</b>",
+        xaxis_title="Date",
+        yaxis_title="Volume",
+        template="plotly_white",
+        height=400,
+        legend=dict(orientation="h", y=1.1)
+    )
+    return fig
+
+def obv_chart(df):
+    """
+    Creates an On-Balance Volume (OBV) chart.
+    """
+    fig = make_subplots(specs=[[{"secondary_y": True}]])
+    
+    # OBV Line
+    fig.add_trace(
+        go.Scatter(x=df['Date'], y=df['OBV'], name='OBV', line=dict(color='#7e57c2', width=2)),
+        secondary_y=False
+    )
+    
+    # Overlay Close Price for comparison
+    fig.add_trace(
+        go.Scatter(x=df['Date'], y=df['Close'], name='Price', line=dict(color='gray', width=1, dash='dot'), opacity=0.5),
+        secondary_y=True
+    )
+    
+    fig.update_layout(
+        title="<b>On-Balance Volume (OBV) vs Price</b>",
+        xaxis_title="Date",
+        template="plotly_white",
+        height=400,
+        legend=dict(orientation="h", y=1.1)
+    )
+    
+    fig.update_yaxes(title_text="OBV", secondary_y=False)
+    fig.update_yaxes(title_text="Price", secondary_y=True, showgrid=False)
+    
     return fig
 
 def volume_chart(df):

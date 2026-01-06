@@ -5,7 +5,7 @@ import time
 from src.loader import load_stock_data, fetch_live_data
 from src.kpis import compute_kpis
 from src.indicators import add_indicators
-from src.charts import candlestick_chart, volume_chart, close_trend
+from src.charts import candlestick_chart, volume_chart, close_trend, volume_analysis_chart, obv_chart
 from src.patterns import detect_candlestick_patterns, get_pattern_insights, get_pattern_description, PATTERN_DESCRIPTIONS
 
 st.set_page_config(page_title="Stock Auto Analysis", layout="wide")
@@ -169,6 +169,30 @@ show_patterns = st.checkbox("Show Patterns on Chart", value=True, help="Toggle t
 st.plotly_chart(candlestick_chart(df, patterns_df, show_patterns=show_patterns), use_container_width=True)
 st.plotly_chart(close_trend(df), use_container_width=True)
 st.plotly_chart(volume_chart(df), use_container_width=True)
+
+# --- Advanced Analysis ---
+st.subheader("🔬 Advanced Volume & Trend Analysis")
+tab1, tab2 = st.tabs(["Volume Analysis", "On-Balance Volume (OBV)"])
+
+with tab1:
+    st.plotly_chart(volume_analysis_chart(df), use_container_width=True)
+    
+    # Display Trend Signal if available
+    if "Trend_Signal" in df.columns:
+        latest_signal = df["Trend_Signal"].iloc[-1]
+        if latest_signal == "Bullish Confirmation":
+            st.success(f"🚀 **Trend Signal**: {latest_signal} (Price ↑ + Vol ↑)")
+        elif latest_signal == "Bearish Selling Pressure":
+            st.error(f"⚠️ **Trend Signal**: {latest_signal} (Price ↓ + Vol ↑)")
+        else:
+            st.info(f"ℹ️ **Trend Signal**: {latest_signal}")
+
+    if "Volume_Breakout" in df.columns and df["Volume_Breakout"].any():
+        st.info("💡 **Insight**: High volume breakouts detected (marked with stars). These often precede significant price moves.")
+
+with tab2:
+    st.plotly_chart(obv_chart(df), use_container_width=True)
+    st.caption("On-Balance Volume (OBV) tracks buying vs selling pressure. Rising OBV + Flat Price = Accumulation (Bullish).")
 
 # --- Detailed Pattern Analysis (Bottom) ---
 if not patterns_df.empty and insights:

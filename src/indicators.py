@@ -16,5 +16,45 @@ def add_indicators(df):
     
     # Set RSI to 100 when avg_loss is zero (all gains, no losses)
     df.loc[avg_loss == 0, "RSI"] = 100.0
+    # --- Volume & Trend Indicators ---
+    
+    # 1. Volume Moving Average (20)
+    df["Volume_MA20"] = df["Volume"].rolling(20).mean()
+    
+    # 2. On-Balance Volume (OBV)
+    # OBV = Cumulative sum of volume * direction (1 if close > prev_close, -1 if less, 0 if equal)
+    # Using pandas apply/diff logic or numpy where
+    # Note: First row of diff is NaN, fill with 0
+    change = df["Close"].diff()
+    direction = change.apply(lambda x: 1 if x > 0 else (-1 if x < 0 else 0))
+    df["OBV"] = (direction * df["Volume"]).cumsum()
+    
+    # 3. VWAP (Volume Weighted Average Price)
+    # Typical Price = (High + Low + Close) / 3
+    # VWAP = Cumulative(Typical Price * Volume) / Cumulative(Volume)
+    typical_price = (df["High"] + df["Low"] + df["Close"]) / 3
+    df["VWAP"] = (typical_price * df["Volume"]).cumsum() / df["Volume"].cumsum()
+    
+    # 4. Volume Breakout Detection
+    # Flag rows where Volume > 1.5 * Volume_MA20
+    df["Volume_Breakout"] = df["Volume"] > (1.5 * df["Volume_MA20"])
+    
+    # 5. Price-Volume Confirmation Signal
+    # Bullish: Price Up + Volume Up
+    # Bearish: Price Down + Volume Up (Selling pressure)
+    vol_change = df["Volume"].diff()
+    
+    conditions = [
+        (change > 0) & (vol_change > 0),
+        (change < 0) & (vol_change > 0)
+    ]
+    choices = ["Bullish Confirmation", "Bearish Selling Pressure"]
+    
+    # We need numpy for 'select', but let's stick to pandas apply if we want to avoid extra imports if possible,
+    # or just add 'import numpy as np' at top if not present. 
+    # Actually, simpler to just start with empty and fill.
+    df["Trend_Signal"] = "Neutral"
+    df.loc[(change > 0) & (vol_change > 0), "Trend_Signal"] = "Bullish Confirmation"
+    df.loc[(change < 0) & (vol_change > 0), "Trend_Signal"] = "Bearish Selling Pressure"
 
     return df
