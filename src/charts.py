@@ -151,6 +151,7 @@ def candlestick_chart(df, patterns_df=None, show_patterns=True):
             x=0.5,
             font=dict(size=20, color="#1f1f1f")
         ),
+        font=dict(color="black"),  # Force global font color to black
         height=700,
         showlegend=True,
         legend=dict(
@@ -203,6 +204,9 @@ def candlestick_chart(df, patterns_df=None, show_patterns=True):
         gridcolor='rgba(128,128,128,0.2)',
         row=2, col=1
     )
+    
+    # Ensure subplot titles are black
+    fig.for_each_annotation(lambda a: a.update(font=dict(color="black")))
     
     # Customize hover template
     fig.update_traces(
