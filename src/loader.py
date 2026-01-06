@@ -9,15 +9,28 @@ def fetch_live_data(ticker, period="1mo", interval="1d"):
     Fetch live stock data using yfinance.
     """
     try:
+        # Validate constraints for yfinance
+        if interval == "1m" and period in ["1mo", "3mo", "1y", "max"]:
+             # 1m data is only available for last 7 days
+             period = "7d"
+        
         # Download data
         df = yf.download(ticker, period=period, interval=interval, progress=False)
         
+        if df.empty:
+            return df # Return empty to let app handle it with "No data found"
+
         # Reset index to make Date a column
         df = df.reset_index()
         
         # Ensure column names are clean (Vectorized DataFrame from yf often has multi-index)
         if isinstance(df.columns, pd.MultiIndex):
-            df.columns = df.columns.get_level_values(0)
+            try:
+                # Try to drop the ticker level if it exists
+                df.columns = df.columns.droplevel(1) 
+            except:
+                # Fallback to get level 0 
+                df.columns = df.columns.get_level_values(0)
             
         # Rename columns to match expected schema
         # yfinance columns are usually: Date, Open, High, Low, Close, Adj Close, Volume
@@ -26,6 +39,17 @@ def fetch_live_data(ticker, period="1mo", interval="1d"):
         
         # Normalize: keep only required columns
         valid_cols = ["Date", "Open", "High", "Low", "Close", "Volume"]
+        
+        # Check if we have the columns we need
+        available_cols = [c for c in valid_cols if c in df.columns]
+        if len(available_cols) < len(valid_cols):
+             # Try checking if columns are lower case
+             df.columns = [c.capitalize() for c in df.columns]
+        
+        # Final check
+        if not all(col in df.columns for col in valid_cols):
+             return pd.DataFrame() # Return empty if schema mismatch
+
         df = df[valid_cols].copy()
         
         return df
