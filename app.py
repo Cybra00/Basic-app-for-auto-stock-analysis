@@ -32,8 +32,26 @@ if data_source == "Upload CSV":
         
 else: # Live Ticker
     ticker = st.sidebar.text_input("Enter Ticker Symbol (e.g. RELIANCE.NS, ^NSEI)", value="^NSEI")
-    interval = st.sidebar.selectbox("Interval", ["1m", "5m", "15m", "30m", "1h", "1d"], index=5)
-    period = st.sidebar.selectbox("Period", ["1d", "5d", "1mo", "3mo", "1y", "max"], index=2)
+    # Valid intervals and periods map
+    valid_periods = {
+        "1m": ["1d", "5d", "7d"],
+        "5m": ["1d", "5d", "1mo", "60d"],
+        "15m": ["1d", "5d", "1mo", "60d"],
+        "30m": ["1d", "5d", "1mo", "60d"],
+        "1h": ["1d", "5d", "1mo", "3mo", "6mo", "1y", "2y"],
+        "1d": ["1mo", "3mo", "6mo", "1y", "2y", "5y", "10y", "ytd", "max"]
+    }
+    
+    interval = st.sidebar.selectbox("Interval", list(valid_periods.keys()), index=5)
+    
+    # Dynamic period selection based on interval
+    available_periods = valid_periods[interval]
+    # Default to a reasonable period (e.g., 1mo for daily, 1d for 1m)
+    default_index = len(available_periods) - 1 if interval == "1m" else 2 if len(available_periods) > 2 else 0
+    if interval == "1m": default_index = 0 # Default 1m to 1d for speed
+    if interval == "1d": default_index = 3 # Default 1d to 1y (index 3 in new list: 1mo, 3mo, 6mo, 1y)
+
+    period = st.sidebar.selectbox("Period", available_periods, index=default_index)
     
     auto_refresh = st.sidebar.checkbox("Enable Live Auto-Refresh (60s)", value=False)
     
