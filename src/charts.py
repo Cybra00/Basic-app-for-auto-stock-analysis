@@ -115,7 +115,7 @@ def candlestick_chart(df, patterns_df=None, show_patterns=True):
                             line=dict(width=1, color='white')
                         ),
                         text=bull_merged['Pattern'],
-                        text=bull_merged['Pattern'],
+
                         customdata=np.stack((bull_merged['Signal'], bull_merged['Status']), axis=-1),
                         hovertemplate="<b>%{text}</b><br>Signal: %{customdata[0]}<br>Status: %{customdata[1]}<extra></extra>"
                     ),
