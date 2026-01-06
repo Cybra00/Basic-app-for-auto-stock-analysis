@@ -161,7 +161,8 @@ def candlestick_chart(df, patterns_df=None, show_patterns=True):
             x=1,
             bgcolor="rgba(255,255,255,0.8)",
             bordercolor="rgba(0,0,0,0.2)",
-            borderwidth=1
+            borderwidth=1,
+            font=dict(color="black")
         ),
         plot_bgcolor='#ffffff',
         paper_bgcolor='#ffffff',
