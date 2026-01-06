@@ -9,10 +9,24 @@ def fetch_live_data(ticker, period="1mo", interval="1d"):
     Fetch live stock data using yfinance.
     """
     try:
-        # Validate constraints for yfinance
-        if interval == "1m" and period in ["1mo", "3mo", "1y", "max"]:
-             # 1m data is only available for last 7 days
-             period = "7d"
+        # Validate constraints for yfinance to prevent "No data found" errors
+        # Intraday data availability limits:
+        # 1m = 7 days
+        # 2m, 5m, 15m, 30m, 90m = 60 days
+        # 1h = 730 days (approx 2 years)
+        
+        if interval == "1m":
+            if period in ["1mo", "3mo", "1y", "max"]:
+                period = "7d"
+        elif interval in ["2m", "5m", "15m", "30m", "90m"]:
+            if period in ["3mo", "1y", "max"]:
+                period = "60d"
+        elif interval == "1h":
+             # 1h is valid for up to 2 years, so purely 'max' might be too much if it tries to fetch older, 
+             # but usually 'max' works if the start date isn't set. 
+             # However, let's play safe for 'max' to avoid errors if yf fails.
+             if period == "max":
+                 period = "2y"
         
         # Download data
         df = yf.download(ticker, period=period, interval=interval, progress=False)
