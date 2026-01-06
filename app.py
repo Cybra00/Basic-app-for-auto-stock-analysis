@@ -1,7 +1,8 @@
 import streamlit as st
 import pandas as pd
 
-from src.loader import load_stock_data
+import time
+from src.loader import load_stock_data, fetch_live_data
 from src.kpis import compute_kpis
 from src.indicators import add_indicators
 from src.charts import candlestick_chart, volume_chart, close_trend
@@ -12,21 +13,55 @@ st.set_page_config(page_title="Stock Auto Analysis", layout="wide")
 st.title("📈 Stock KPI Auto-Analysis Dashboard (v2.1 DEBUG)")
 
 # --- CSV Upload ---
-uploaded_file = st.sidebar.file_uploader(
-    "Upload Stock OHLCV CSV",
-    type=["csv"]
-)
+# --- Data Source Selection ---
+data_source = st.sidebar.radio("Data Source", ["Upload CSV", "Live Ticker"], index=0)
 
-if uploaded_file is None:
-    st.warning("Please upload a stock CSV file to begin analysis.")
-    st.stop()
+df = pd.DataFrame()
 
-# --- Load & Validate ---
-try:
-    df = load_stock_data(uploaded_file)
-except Exception as e:
-    st.error(str(e))
-    st.stop()
+if data_source == "Upload CSV":
+    uploaded_file = st.sidebar.file_uploader("Upload Stock OHLCV CSV", type=["csv"])
+    if uploaded_file is not None:
+        try:
+            df = load_stock_data(uploaded_file)
+        except Exception as e:
+            st.error(str(e))
+            st.stop()
+    else:
+        st.warning("Please upload a stock CSV file to begin analysis.")
+        st.stop()
+        
+else: # Live Ticker
+    ticker = st.sidebar.text_input("Enter Ticker Symbol (e.g. RELIANCE.NS, ^NSEI)", value="^NSEI")
+    interval = st.sidebar.selectbox("Interval", ["1m", "5m", "15m", "30m", "1h", "1d"], index=5)
+    period = st.sidebar.selectbox("Period", ["1d", "5d", "1mo", "3mo", "1y", "max"], index=2)
+    
+    auto_refresh = st.sidebar.checkbox("Enable Live Auto-Refresh (60s)", value=False)
+    
+    if st.sidebar.button("Fetch Data") or auto_refresh:
+        try:
+            with st.spinner(f"Fetching data for {ticker}..."):
+                df = fetch_live_data(ticker, period=period, interval=interval)
+            
+            if df.empty:
+                st.error("No data found. Check ticker symbol.")
+                st.stop()
+                
+            st.success(f"Fetched {len(df)} rows for {ticker}")
+            
+        except Exception as e:
+            st.error(f"Error fetching data: {str(e)}")
+            st.stop()
+    
+    if df.empty:
+        st.info("Enter ticker and click 'Fetch Data'")
+        st.stop()
+
+    # Auto-refresh logic
+    if auto_refresh:
+        time.sleep(60)
+        st.rerun()
+
+
 
 # --- Auto Analysis Pipeline ---
 df = add_indicators(df)
@@ -35,11 +70,21 @@ kpis = compute_kpis(df)
 # Detect patterns with error handling
 try:
     patterns_df = detect_candlestick_patterns(df)
+    
+    # Add Status column
+    if not patterns_df.empty:
+        patterns_df["Status"] = "Confirmed"
+        
+        # In Live Mode, mark patterns on the last candle as Unconfirmed
+        if data_source == "Live Ticker" and not df.empty:
+            last_date = df["Date"].iloc[-1]
+            patterns_df.loc[patterns_df["Date"] == last_date, "Status"] = "Unconfirmed"
+            
     # Debug: Show pattern count in sidebar
     with st.sidebar:
         st.write(f"**Patterns Detected**: {len(patterns_df)}")
 except Exception as e:
-    patterns_df = pd.DataFrame(columns=["Date", "Pattern", "Type", "Signal", "Price"])
+    patterns_df = pd.DataFrame(columns=["Date", "Pattern", "Type", "Signal", "Price", "Status"])
     st.error(f"Error detecting patterns: {str(e)}")
 
 # --- Show Pattern Status Prominently ---
@@ -99,7 +144,7 @@ else:
     
     # Display recent patterns table with enhanced formatting
     st.write("### 📊 Recent Detected Patterns")
-    display_patterns = patterns_df.tail(15)[["Date", "Pattern", "Type", "Signal", "Price"]].copy()
+    display_patterns = patterns_df.tail(15)[["Date", "Pattern", "Type", "Signal", "Price", "Status"]].copy()
     display_patterns["Date"] = display_patterns["Date"].dt.strftime("%Y-%m-%d")
     display_patterns["Price"] = display_patterns["Price"].apply(lambda x: f"₹{x:.2f}")
     

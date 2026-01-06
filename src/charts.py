@@ -2,6 +2,7 @@
 import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
+import numpy as np
 
 def candlestick_chart(df, patterns_df=None, show_patterns=True):
     """
@@ -114,8 +115,9 @@ def candlestick_chart(df, patterns_df=None, show_patterns=True):
                             line=dict(width=1, color='white')
                         ),
                         text=bull_merged['Pattern'],
-                        customdata=bull_merged['Signal'],
-                        hovertemplate="<b>%{text}</b><br>Signal: %{customdata}<extra></extra>"
+                        text=bull_merged['Pattern'],
+                        customdata=np.stack((bull_merged['Signal'], bull_merged['Status']), axis=-1),
+                        hovertemplate="<b>%{text}</b><br>Signal: %{customdata[0]}<br>Status: %{customdata[1]}<extra></extra>"
                     ),
                     row=1, col=1
                 )
@@ -138,8 +140,8 @@ def candlestick_chart(df, patterns_df=None, show_patterns=True):
                             line=dict(width=1, color='white')
                         ),
                         text=bear_merged['Pattern'],
-                        customdata=bear_merged['Signal'],
-                        hovertemplate="<b>%{text}</b><br>Signal: %{customdata}<extra></extra>"
+                        customdata=np.stack((bear_merged['Signal'], bear_merged['Status']), axis=-1),
+                        hovertemplate="<b>%{text}</b><br>Signal: %{customdata[0]}<br>Status: %{customdata[1]}<extra></extra>"
                     ),
                     row=1, col=1
                 )

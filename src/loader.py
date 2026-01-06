@@ -1,7 +1,37 @@
 # src/loader.py
 import pandas as pd
+import yfinance as yf
 
 REQUIRED_COLUMNS = ["Date", "Open", "High", "Low", "Close", "Volume"]
+
+def fetch_live_data(ticker, period="1mo", interval="1d"):
+    """
+    Fetch live stock data using yfinance.
+    """
+    try:
+        # Download data
+        df = yf.download(ticker, period=period, interval=interval, progress=False)
+        
+        # Reset index to make Date a column
+        df = df.reset_index()
+        
+        # Ensure column names are clean (Vectorized DataFrame from yf often has multi-index)
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.get_level_values(0)
+            
+        # Rename columns to match expected schema
+        # yfinance columns are usually: Date, Open, High, Low, Close, Adj Close, Volume
+        # We need to map them correctly and ensure proper case
+        # Note: yfinance output is already Title Case usually, but let's be safe
+        
+        # Normalize: keep only required columns
+        valid_cols = ["Date", "Open", "High", "Low", "Close", "Volume"]
+        df = df[valid_cols].copy()
+        
+        return df
+        
+    except Exception as e:
+        raise ValueError(f"Failed to fetch data for {ticker}: {str(e)}")
 
 def load_stock_data(file):
     df = pd.read_csv(file)
