@@ -19,9 +19,9 @@ def fetch_live_data(ticker, period="1mo", interval="1d"):
         original_period = period
         
         if interval == "1m":
-            if period in ["1mo", "3mo", "1y", "max"]:
-                period = "7d"
-                warning_msg = f"⚠️ Limit reached: 1m data is restricted to last 7 days. Adjusted '{original_period}' to '7d'."
+            if period in ["1mo", "3mo", "1y", "max", "7d"]: # added 7d as it can be flaky
+                period = "5d" # 5d is more reliable for 1m data than 7d
+                warning_msg = f"⚠️ Limit reached: 1m data is restricted to last 5 days (stable). Adjusted '{original_period}' to '5d'."
         elif interval in ["2m", "5m", "15m", "30m", "90m"]:
             if period in ["3mo", "1y", "max"]:
                 period = "60d"
@@ -34,6 +34,17 @@ def fetch_live_data(ticker, period="1mo", interval="1d"):
         # Download data
         df = yf.download(ticker, period=period, interval=interval, progress=False)
         
+        # Fallback logic for 1m data (often flaky for >1d even if technically supported)
+        if df.empty and interval == "1m" and period != "1d":
+             fallback_period = "1d"
+             # Only try fallback if we aren't already on 1d
+             df = yf.download(ticker, period=fallback_period, interval=interval, progress=False)
+             if not df.empty:
+                 if warning_msg:
+                     warning_msg += f" (Note: Adjusted period returned no data, fell back to '{fallback_period}' which worked.)"
+                 else:
+                     warning_msg = f"⚠️ Request for '{period}' returned no data. Automatically fell back to '{fallback_period}'."
+
         if df.empty:
             return df, None # Return empty to let app handle it with "No data found"
 
