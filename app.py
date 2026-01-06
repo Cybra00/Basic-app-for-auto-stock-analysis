@@ -114,13 +114,18 @@ col2.metric("Daily Return", f"{kpis['daily_return_pct']:.2f}%")
 col3.metric("52W High", f"₹{kpis['high_52w']:.2f}")
 col4.metric("Volatility", f"{kpis['volatility_pct']:.2f}%")
 
-# --- Candlestick Pattern Detection ---
+# --- Candlestick Pattern Detection (Summary) ---
 st.subheader("🕯️ Candlestick Pattern Detection & Analysis")
 
 if not patterns_df.empty:
     st.success(f"✅ **{len(patterns_df)} Patterns Detected**")
 
-# Always show pattern detection status
+# Calculate insights early for summary
+insights = None
+if not patterns_df.empty:
+    insights = get_pattern_insights(patterns_df, df)
+
+# Always show pattern detection status/summary
 if patterns_df.empty:
     st.warning("⚠️ No candlestick patterns detected in the current data.")
     st.info("💡 **Tips to see patterns:**\n"
@@ -138,9 +143,6 @@ if patterns_df.empty:
             st.write("**Sample Data (First 5 rows):**")
             st.dataframe(df[["Date", "Open", "High", "Low", "Close"]].head(), use_container_width=True)
 else:
-    # Get comprehensive insights
-    insights = get_pattern_insights(patterns_df, df)
-    
     # Display sentiment summary in columns
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -150,9 +152,31 @@ else:
     with col3:
         sentiment_color = "🟢" if "Bullish" in insights["sentiment"] else "🔴" if "Bearish" in insights["sentiment"] else "🟡"
         st.metric("Market Sentiment", f"{sentiment_color} {insights['sentiment']}")
+
+# --- Auto Insight ---
+st.subheader("📌 Auto Insight")
+if kpis["daily_return_pct"] > 0 and df["Volume"].iloc[-1] > kpis["avg_volume"]:
+    st.success("Bullish move supported by strong volume.")
+elif kpis["daily_return_pct"] < 0:
+    st.warning("Stock closed lower – short-term weakness.")
+else:
+    st.info("Stock is consolidating.")
+
+# --- Charts ---
+# Add toggle for patterns
+show_patterns = st.checkbox("Show Patterns on Chart", value=True, help="Toggle to show/hide candlestick pattern markers")
+
+st.plotly_chart(candlestick_chart(df, patterns_df, show_patterns=show_patterns), use_container_width=True)
+st.plotly_chart(close_trend(df), use_container_width=True)
+st.plotly_chart(volume_chart(df), use_container_width=True)
+
+# --- Detailed Pattern Analysis (Bottom) ---
+if not patterns_df.empty and insights:
+    st.markdown("---")
+    st.subheader("📊 Detailed Pattern Analysis")
     
     # Display recent patterns table with enhanced formatting
-    st.write("### 📊 Recent Detected Patterns")
+    st.write("### Recent Detected Patterns")
     display_patterns = patterns_df.tail(15)[["Date", "Pattern", "Type", "Signal", "Price", "Status"]].copy()
     display_patterns["Date"] = display_patterns["Date"].dt.strftime("%Y-%m-%d")
     display_patterns["Price"] = display_patterns["Price"].apply(lambda x: f"₹{x:.2f}")
@@ -222,23 +246,6 @@ else:
             st.write(f"**Meaning**: {pattern_info['meaning']}")
             st.write(f"**Reliability**: {pattern_info['reliability']}")
             st.divider()
-
-# --- Insight ---
-st.subheader("📌 Auto Insight")
-if kpis["daily_return_pct"] > 0 and df["Volume"].iloc[-1] > kpis["avg_volume"]:
-    st.success("Bullish move supported by strong volume.")
-elif kpis["daily_return_pct"] < 0:
-    st.warning("Stock closed lower – short-term weakness.")
-else:
-    st.info("Stock is consolidating.")
-
-# --- Charts ---
-# Add toggle for patterns
-show_patterns = st.checkbox("Show Patterns on Chart", value=True, help="Toggle to show/hide candlestick pattern markers")
-
-st.plotly_chart(candlestick_chart(df, patterns_df, show_patterns=show_patterns), use_container_width=True)
-st.plotly_chart(close_trend(df), use_container_width=True)
-st.plotly_chart(volume_chart(df), use_container_width=True)
 
 # Auto-refresh logic moved to end
 if "auto_refresh" in locals() and auto_refresh:
