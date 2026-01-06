@@ -40,7 +40,10 @@ else: # Live Ticker
     if st.sidebar.button("Fetch Data") or auto_refresh:
         try:
             with st.spinner(f"Fetching data for {ticker}..."):
-                df = fetch_live_data(ticker, period=period, interval=interval)
+                df, warning_msg = fetch_live_data(ticker, period=period, interval=interval)
+            
+            if warning_msg:
+                st.warning(warning_msg)
             
             if df.empty:
                 st.error("No data found. Check ticker symbol.")

@@ -15,24 +15,27 @@ def fetch_live_data(ticker, period="1mo", interval="1d"):
         # 2m, 5m, 15m, 30m, 90m = 60 days
         # 1h = 730 days (approx 2 years)
         
+        warning_msg = None
+        original_period = period
+        
         if interval == "1m":
             if period in ["1mo", "3mo", "1y", "max"]:
                 period = "7d"
+                warning_msg = f"⚠️ Limit reached: 1m data is restricted to last 7 days. Adjusted '{original_period}' to '7d'."
         elif interval in ["2m", "5m", "15m", "30m", "90m"]:
             if period in ["3mo", "1y", "max"]:
                 period = "60d"
+                warning_msg = f"⚠️ Limit reached: {interval} data is restricted to last 60 days. Adjusted '{original_period}' to '60d'."
         elif interval == "1h":
-             # 1h is valid for up to 2 years, so purely 'max' might be too much if it tries to fetch older, 
-             # but usually 'max' works if the start date isn't set. 
-             # However, let's play safe for 'max' to avoid errors if yf fails.
              if period == "max":
                  period = "2y"
+                 warning_msg = f"⚠️ Limit reached: 1h data is restricted to last 730 days. Adjusted '{original_period}' to '2y'."
         
         # Download data
         df = yf.download(ticker, period=period, interval=interval, progress=False)
         
         if df.empty:
-            return df # Return empty to let app handle it with "No data found"
+            return df, None # Return empty to let app handle it with "No data found"
 
         # Reset index to make Date a column
         df = df.reset_index()
@@ -62,11 +65,11 @@ def fetch_live_data(ticker, period="1mo", interval="1d"):
         
         # Final check
         if not all(col in df.columns for col in valid_cols):
-             return pd.DataFrame() # Return empty if schema mismatch
+             return pd.DataFrame(), None # Return empty if schema mismatch
 
         df = df[valid_cols].copy()
         
-        return df
+        return df, warning_msg
         
     except Exception as e:
         raise ValueError(f"Failed to fetch data for {ticker}: {str(e)}")
