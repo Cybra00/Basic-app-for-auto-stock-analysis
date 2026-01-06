@@ -197,7 +197,9 @@ def candlestick_chart(df, patterns_df=None, show_patterns=True):
             side="right",
             title_font=dict(color="black"),
             tickfont=dict(color="black")
-        )
+        ),
+        # Preserve user state (zoom, pan, etc.) on refresh
+        uirevision=True 
     )
     
     # Update x-axis for volume subplot
