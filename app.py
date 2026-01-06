@@ -56,10 +56,7 @@ else: # Live Ticker
         st.info("Enter ticker and click 'Fetch Data'")
         st.stop()
 
-    # Auto-refresh logic
-    if auto_refresh:
-        time.sleep(60)
-        st.rerun()
+    # Auto-refresh logic moved to end
 
 
 
@@ -222,3 +219,8 @@ elif kpis["daily_return_pct"] < 0:
     st.warning("Stock closed lower – short-term weakness.")
 else:
     st.info("Stock is consolidating.")
+
+# Auto-refresh logic moved to end
+if "auto_refresh" in locals() and auto_refresh:
+    time.sleep(60)
+    st.rerun()
