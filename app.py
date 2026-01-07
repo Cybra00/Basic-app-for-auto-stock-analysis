@@ -295,12 +295,21 @@ if not patterns_df.empty and insights:
         if insights["recommendations"]:
             rec = insights["recommendations"][0]
             st.write("#### 💡 Trading Recommendation")
-            if rec["action"] == "Consider buying opportunity":
-                st.success(f"**{rec['action']}** - {pattern_name} suggests potential upward movement.")
-            elif rec["action"] == "Consider selling/caution":
-                st.error(f"**{rec['action']}** - {pattern_name} suggests potential downward movement.")
+            
+            # Dynamic styling based on keywords in the new rich action string
+            action_text = rec['action']
+            
+            if "Buy" in action_text and "Strong" in action_text:
+                st.success(f"**Action**: {action_text}")
+            elif "Sell" in action_text and "Strong" in action_text:
+                st.error(f"**Action**: {action_text}")
+            elif "Contratrend" in action_text:
+                st.warning(f"**Action**: {action_text}")
             else:
-                st.info(f"**{rec['action']}** - {pattern_name} requires confirmation from next candle.")
+                st.info(f"**Action**: {action_text}")
+                
+            # Use dynamic reliability which includes Historical Accuracy
+            st.write(f"**Reliability**: {rec.get('reliability', pattern_desc['reliability'])}")
     
     # Pattern descriptions reference
     st.write("### 📚 Pattern Reference Guide")
