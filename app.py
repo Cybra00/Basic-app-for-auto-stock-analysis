@@ -16,13 +16,16 @@ st.title("📈 Stock KPI Auto-Analysis Dashboard (v2.1 DEBUG)")
 # --- Data Source Selection ---
 data_source = st.sidebar.radio("Data Source", ["Upload CSV", "Live Ticker"], index=0)
 
-df = pd.DataFrame()
+if 'stock_data' not in st.session_state:
+    st.session_state['stock_data'] = pd.DataFrame()
+df = st.session_state['stock_data']
 
 if data_source == "Upload CSV":
     uploaded_file = st.sidebar.file_uploader("Upload Stock OHLCV CSV", type=["csv"])
     if uploaded_file is not None:
         try:
             df = load_stock_data(uploaded_file)
+            st.session_state['stock_data'] = df
         except Exception as e:
             st.error(str(e))
             st.stop()
@@ -59,6 +62,7 @@ else: # Live Ticker
         try:
             with st.spinner(f"Fetching data for {ticker}..."):
                 df, warning_msg = fetch_live_data(ticker, period=period, interval=interval)
+                st.session_state['stock_data'] = df
             
             if warning_msg:
                 st.warning(warning_msg)

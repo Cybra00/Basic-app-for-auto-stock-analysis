@@ -226,19 +226,23 @@ def get_pattern_insights(patterns_df, df):
             "recommendations": []
         }
     
+    # Calculate TOTAL counts for dashboard consistency
+    total_bullish = len(patterns_df[patterns_df["Signal"] == "Bullish"])
+    total_bearish = len(patterns_df[patterns_df["Signal"] == "Bearish"])
+    total_neutral = len(patterns_df[patterns_df["Signal"] == "Neutral"])
+
     # Get recent patterns (last 20 for better analysis)
     recent_patterns = patterns_df.tail(20)
     
-    # Count pattern types
-    bullish_count = len(recent_patterns[recent_patterns["Signal"] == "Bullish"])
-    bearish_count = len(recent_patterns[recent_patterns["Signal"] == "Bearish"])
-    neutral_count = len(recent_patterns[recent_patterns["Signal"] == "Neutral"])
+    # Count RECENT pattern types for SENTIMENT analysis
+    recent_bullish = len(recent_patterns[recent_patterns["Signal"] == "Bullish"])
+    recent_bearish = len(recent_patterns[recent_patterns["Signal"] == "Bearish"])
     
     # --- Sentiment Analysis & Logic Optimization ---
     # Calculate Base Score from Pattern Counts
     sentiment_score = 0
-    sentiment_score += bullish_count * 1  # Base value for bullish patterns
-    sentiment_score -= bearish_count * 1  # Base value for bearish patterns
+    sentiment_score += recent_bullish * 1  # Base value for bullish patterns
+    sentiment_score -= recent_bearish * 1  # Base value for bearish patterns
     
     # --- Integration of Trend (Optimization) ---
     # We check if the price is above or below the 50-day Moving Average (MA50)
@@ -316,9 +320,9 @@ def get_pattern_insights(patterns_df, df):
     
     # Summary text
     summary_parts = []
-    if bullish_count > 0 or bearish_count > 0:
+    if total_bullish > 0 or total_bearish > 0:
         summary_parts.append(f"**Market Sentiment**: {sentiment}")
-        summary_parts.append(f"Detected {bullish_count} bullish, {bearish_count} bearish, and {neutral_count} neutral patterns in recent data.")
+        summary_parts.append(f"Detected {total_bullish} bullish, {total_bearish} bearish, and {total_neutral} neutral patterns in TOTAL data.")
     
     if latest_pattern is not None:
         summary_parts.append(f"**Latest Pattern**: {latest_pattern['Pattern']} on {latest_pattern['Date'].strftime('%Y-%m-%d')} at ₹{latest_pattern['Price']:.2f}")
@@ -326,9 +330,9 @@ def get_pattern_insights(patterns_df, df):
     return {
         "summary": "\n\n".join(summary_parts),
         "sentiment": sentiment,
-        "bullish_count": bullish_count,
-        "bearish_count": bearish_count,
-        "neutral_count": neutral_count,
+        "bullish_count": total_bullish,
+        "bearish_count": total_bearish,
+        "neutral_count": total_neutral,
         "latest_pattern": latest_pattern,
         "pattern_counts": pattern_counts,
         "recommendations": recommendations,
