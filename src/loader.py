@@ -46,7 +46,16 @@ def fetch_live_data(ticker, period="1mo", interval="1d"):
                      warning_msg = f"⚠️ Request for '{period}' returned no data. Automatically fell back to '{fallback_period}'."
 
         if df.empty:
-            return df, None # Return empty to let app handle it with "No data found"
+            return df, None, {} # Return empty to let app handle it with "No data found"
+
+        # Try to get previous close from fast_info
+        previous_close = None
+        try:
+            previous_close = ticker_obj.fast_info.previous_close
+        except:
+            pass # Fail silently if not available
+            
+        metadata = {"previous_close": previous_close}
 
         # Reset index to make Date a column
         df = df.reset_index()
@@ -74,11 +83,11 @@ def fetch_live_data(ticker, period="1mo", interval="1d"):
         
         # Final check
         if not all(col in df.columns for col in valid_cols):
-             return pd.DataFrame(), None # Return empty if schema mismatch
+             return pd.DataFrame(), None, {} # Return empty if schema mismatch
 
         df = df[valid_cols].copy()
         
-        return df, warning_msg
+        return df, warning_msg, metadata
         
     except Exception as e:
         raise ValueError(f"Failed to fetch data for {ticker}: {str(e)}")
@@ -108,4 +117,4 @@ def load_stock_data(file):
     if df.empty:
         raise ValueError("CSV contains no valid stock data after cleaning.")
 
-    return df
+    return df, {}, {} # Return empty metadata for consistency (extra dict for future use)

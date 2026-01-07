@@ -26,8 +26,9 @@ if data_source == "Upload CSV":
     uploaded_file = st.sidebar.file_uploader("Upload Stock OHLCV CSV", type=["csv"])
     if uploaded_file is not None:
         try:
-            df = load_stock_data(uploaded_file)
+            df, metadata, _ = load_stock_data(uploaded_file)
             st.session_state['stock_data'] = df
+            st.session_state['stock_metadata'] = metadata
         except Exception as e:
             st.error(str(e))
             st.stop()
@@ -63,8 +64,9 @@ else: # Live Ticker
     if st.sidebar.button("Fetch Data") or auto_refresh:
         try:
             with st.spinner(f"Fetching data for {ticker}..."):
-                df, warning_msg = fetch_live_data(ticker, period=period, interval=interval)
+                df, warning_msg, metadata = fetch_live_data(ticker, period=period, interval=interval)
                 st.session_state['stock_data'] = df
+                st.session_state['stock_metadata'] = metadata
             
             if warning_msg:
                 st.warning(warning_msg)
@@ -88,8 +90,9 @@ else: # Live Ticker
 
 
 # --- Auto Analysis Pipeline ---
+metadata = st.session_state.get('stock_metadata', {})
 df = add_indicators(df)
-kpis = compute_kpis(df)
+kpis = compute_kpis(df, metadata)
 
 # Detect patterns with error handling
 try:
@@ -117,8 +120,8 @@ except Exception as e:
 col1, col2, col3, col4 = st.columns(4)
 col1.metric("Latest Price", f"₹{kpis['latest_price']:.2f}")
 col2.metric("Daily Return", f"{kpis['daily_return_pct']:.2f}%")
-col3.metric("52W High", f"₹{kpis['high_52w']:.2f}")
-col4.metric("Volatility", f"{kpis['volatility_pct']:.2f}%")
+col3.metric(kpis['high_label'], f"₹{kpis['high_value']:.2f}")
+col4.metric("Volatility (Ann.)", f"{kpis['volatility_pct']:.2f}%")
 
 # --- Data Freshness Check ---
 last_update = df["Date"].max()
