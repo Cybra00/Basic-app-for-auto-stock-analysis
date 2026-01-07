@@ -204,16 +204,16 @@ else:
 # Add toggle for patterns
 show_patterns = st.checkbox("Show Patterns on Chart", value=True, help="Toggle to show/hide candlestick pattern markers")
 
-st.plotly_chart(candlestick_chart(df, patterns_df, show_patterns=show_patterns), use_container_width=True)
-st.plotly_chart(close_trend(df), use_container_width=True)
-st.plotly_chart(volume_chart(df), use_container_width=True)
+st.plotly_chart(candlestick_chart(df, patterns_df, show_patterns=show_patterns), use_container_width=True, key="candlestick_main")
+st.plotly_chart(close_trend(df), use_container_width=True, key="close_trend")
+st.plotly_chart(volume_chart(df), use_container_width=True, key="volume_chart")
 
 # --- Advanced Analysis ---
 st.subheader("🔬 Advanced Volume & Trend Analysis")
 tab1, tab2 = st.tabs(["Volume Analysis", "On-Balance Volume (OBV)"])
 
 with tab1:
-    st.plotly_chart(volume_analysis_chart(df), use_container_width=True)
+    st.plotly_chart(volume_analysis_chart(df), use_container_width=True, key="volume_analysis")
     
     # Display Trend Signal if available
     if "Trend_Signal" in df.columns:
@@ -229,7 +229,7 @@ with tab1:
         st.info("💡 **Insight**: High volume breakouts detected (marked with stars). These often precede significant price moves.")
 
 with tab2:
-    st.plotly_chart(obv_chart(df), use_container_width=True)
+    st.plotly_chart(obv_chart(df), use_container_width=True, key="obv_chart")
     st.caption("On-Balance Volume (OBV) tracks buying vs selling pressure. Rising OBV + Flat Price = Accumulation (Bullish).")
 
 # --- Detailed Pattern Analysis (Bottom) ---
