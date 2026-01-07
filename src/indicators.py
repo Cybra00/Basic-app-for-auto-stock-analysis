@@ -58,4 +58,11 @@ def add_indicators(df):
     df.loc[(change > 0) & (vol_change > 0), "Trend_Signal"] = "Bullish Confirmation"
     df.loc[(change < 0) & (vol_change > 0), "Trend_Signal"] = "Bearish Selling Pressure"
 
+    # 6. MACD (Moving Average Convergence Divergence)
+    exp12 = df['Close'].ewm(span=12, adjust=False).mean()
+    exp26 = df['Close'].ewm(span=26, adjust=False).mean()
+    df['MACD'] = exp12 - exp26
+    df['Signal_Line'] = df['MACD'].ewm(span=9, adjust=False).mean()
+    df['MACD_Hist'] = df['MACD'] - df['Signal_Line']
+
     return df

@@ -217,6 +217,54 @@ def detect_candlestick_patterns(df):
     return result_df
 
 
+def calculate_pattern_accuracy(df, patterns_df):
+    """
+    Backtest: Calculate historical win rate for each pattern type.
+    Win Condition: Price increases > 0.5% in next 3 bars (Bullish) or drops > 0.5% (Bearish)
+    Returns: Dict {PatternName: "WinRate% (Count)"}
+    """
+    if patterns_df.empty or df.empty:
+        return {}
+        
+    accuracy_map = {}
+    pattern_types = patterns_df["Pattern"].unique()
+    
+    # Pre-calculate future returns for efficiency
+    # checking 3-bar forward return
+    future_return = df["Close"].shift(-3) / df["Close"] - 1
+    
+    # Create a mapping of Date -> Return
+    returns_map = dict(zip(df["Date"], future_return))
+    
+    for p_name in pattern_types:
+        subset = patterns_df[patterns_df["Pattern"] == p_name]
+        wins = 0
+        total = 0
+        
+        for _, row in subset.iterrows():
+            date = row["Date"]
+            signal = row["Signal"]
+            
+            # Skip if we can't check future outcome (e.g. today's pattern)
+            if date not in returns_map or pd.isna(returns_map[date]):
+                continue
+                
+            ret = returns_map[date]
+            total += 1
+            
+            if signal == "Bullish" and ret > 0.005: # > 0.5% gain
+                wins += 1
+            elif signal == "Bearish" and ret < -0.005: # > 0.5% loss
+                wins += 1
+                
+        if total >= 3: # Only report if we have significant history
+            win_rate = int((wins / total) * 100)
+            accuracy_map[p_name] = f"{win_rate}% (Based on {total} historic occurrences)"
+        else:
+            accuracy_map[p_name] = "Insufficient history"
+            
+    return accuracy_map
+
 def get_pattern_insights(patterns_df, df):
     """
     Generate comprehensive insights from detected candlestick patterns using WEIGHTED SCORING.
@@ -296,12 +344,31 @@ def get_pattern_insights(patterns_df, df):
     sentiment_score += trend_score_mod
     
     # --- 4. MOMENTUM VETO (CRITICAL FIX) ---
-    # If the latest candle receives a strong negative move (Red Candle), 
-    # we CANNOT call it "Strongly Bullish" regardless of history.
-    
     is_red_candle = latest_close < latest_open
     is_green_candle = latest_close > latest_open
     
+    # --- 5. MOMENTUM CONFIRMATION (MACD & RSI) ---
+    macd_signal = "Neutral"
+    if "MACD" in df.columns and "Signal_Line" in df.columns:
+        macd_val = df["MACD"].iloc[-1]
+        sig_val = df["Signal_Line"].iloc[-1]
+        if macd_val > sig_val:
+            macd_signal = "Bullish"
+        else:
+            macd_signal = "Bearish"
+            
+    rsi_signal = "Neutral"
+    if "RSI" in df.columns:
+        rsi_val = df["RSI"].iloc[-1]
+        if rsi_val > 70:
+            rsi_signal = "Overbought (Risk of Pullback)"
+        elif rsi_val < 30:
+            rsi_signal = "Oversold (Bounce Potential)"
+        elif rsi_val > 50:
+            rsi_signal = "Bullish Zone"
+        else:
+            rsi_signal = "Bearish Zone"
+
     # --- Final Sentiment Classification ---
     if sentiment_score >= 8:
         sentiment = "Strongly Bullish"
@@ -326,21 +393,18 @@ def get_pattern_insights(patterns_df, df):
     else:
         sentiment = "Mixed/Neutral"
     
-    # Recommendations Logic
+    # --- 6. HISTORICAL ACCURACY & RECOMMENDATIONS ---
+    accuracy_stats = calculate_pattern_accuracy(df, patterns_df)
+    
     latest_pattern = recent_patterns.iloc[-1] if not recent_patterns.empty else None
     recommendations = []
     
     if latest_pattern is not None:
         pattern_name = latest_pattern['Pattern']
         p_desc = PATTERN_DESCRIPTIONS.get(pattern_name, {})
-        
-        action = "Watch for confirmation"
         signal = latest_pattern['Signal']
         
-        # Context-Aware Advise
-        # Context-Aware Advise
-        # Check Trend Alignment (Price > VWAP and Price > MA50)
-        # Note: df contains the full data with indicators
+        # Trend Context
         latest_close = df["Close"].iloc[-1]
         vwap = df["VWAP"].iloc[-1] if "VWAP" in df.columns else latest_close
         ma50 = df["MA50"].iloc[-1] if "MA50" in df.columns else latest_close
@@ -348,38 +412,47 @@ def get_pattern_insights(patterns_df, df):
         is_uptrend = (latest_close > vwap) and (latest_close > ma50)
         is_downtrend = (latest_close < vwap) and (latest_close < ma50)
         
+        action = "Watch for confirmation"
+        
         if signal == 'Bullish':
             if is_uptrend:
-                action = "✅ Strong Buy Signal (Pattern aligns with Trend) - Watch for confirmation"
+                action = "✅ Strong Buy Signal (Trend Aligned) - Watch for confirmation"
             elif is_downtrend:
-                action = "⚠️ Contratrend Buy Signal (Down Trend - High Risk) - Wait for strong reversal"
+                action = "⚠️ Contratrend Buy Signal (High Risk) - Wait for strong reversal"
             else:
-                action = "🤔 Tactical Buy (Neutral/Mixed Trend) - Watch for confirmation"
-                
+                action = "🤔 Tactical Buy (Mixed Trend) - Watch for confirmation"
         elif signal == 'Bearish':
             if is_downtrend:
-                action = "✅ Strong Sell Signal (Pattern aligns with Trend) - Watch for confirmation"
+                action = "✅ Strong Sell Signal (Trend Aligned) - Watch for confirmation"
             elif is_uptrend:
-                action = "⚠️ Contratrend Sell Signal (Up Trend - Potential Pullback) - Wait for confirmation"
+                action = "⚠️ Contratrend Sell Signal (High Risk) - Wait for confirmation"
             else:
-                action = "🤔 Tactical Sell (Neutral/Mixed Trend) - Watch for confirmation"
+                action = "🤔 Tactical Sell (Mixed Trend) - Watch for confirmation"
+        
+        # Momentum Warning
+        if signal == 'Bullish' and macd_signal == 'Bearish':
+            action += " (⚠️ Momentum Contradiction: Negative MACD)"
+        if signal == 'Bearish' and macd_signal == 'Bullish':
+            action += " (⚠️ Momentum Contradiction: Positive MACD)"
+            
+        # Add Accuracy Stats
+        hist_acc = accuracy_stats.get(pattern_name, "N/A - Insufficient History")
         
         recommendations.append({
             "pattern": pattern_name,
             "action": action,
             "description": p_desc.get("description", ""),
             "meaning": p_desc.get("meaning", ""),
-            "reliability": p_desc.get("reliability", "")
+            "reliability": f"{p_desc.get('reliability', '')} | 📊 Historical Accuracy: {hist_acc}"
         })
         
-    # Pattern frequency for chart
     pattern_counts = recent_patterns["Pattern"].value_counts().to_dict()
     
     # Construct Summary
     summary_parts = []
     summary_parts.append(f"**Market Bias**: {sentiment}")
     summary_parts.append(f"**Trend Context**: {trend}")
-    summary_parts.append(f"**Momentum**: {'Bearish (Price Drop)' if is_red_candle else 'Bullish (Price Rise)' if is_green_candle else 'Neutral'}")
+    summary_parts.append(f"**Momentum**: {macd_signal} MACD, {rsi_signal} RSI")
     
     return {
         "summary": "\n\n".join(summary_parts),
