@@ -36,8 +36,9 @@ def add_indicators(df):
     df["VWAP"] = (typical_price * df["Volume"]).cumsum() / df["Volume"].cumsum()
     
     # 4. Volume Breakout Detection
-    # Flag rows where Volume > 1.5 * Volume_MA20
-    df["Volume_Breakout"] = df["Volume"] > (1.5 * df["Volume_MA20"])
+    # Trader Standard: Volume > 3x Average AND Price Change > 0.5% (avoid churn)
+    pct_change = df["Close"].pct_change().abs()
+    df["Volume_Breakout"] = (df["Volume"] > (3.0 * df["Volume_MA20"])) & (pct_change > 0.005)
     
     # 5. Price-Volume Confirmation Signal
     # Bullish: Price Up + Volume Up
