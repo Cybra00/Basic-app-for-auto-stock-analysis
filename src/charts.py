@@ -225,7 +225,7 @@ def candlestick_chart(df, patterns_df=None, show_patterns=True):
             tickfont=dict(color="black")
         ),
         # Preserve user state (zoom, pan, etc.) on refresh
-        uirevision=True 
+        uirevision='static' 
     )
     
     # Update x-axis for volume subplot
@@ -310,7 +310,8 @@ def volume_analysis_chart(df):
         yaxis_title="Volume",
         template="plotly_white",
         height=400,
-        legend=dict(orientation="h", y=1.1)
+        legend=dict(orientation="h", y=1.1),
+        uirevision='static'
     )
     return fig
 
@@ -337,7 +338,8 @@ def obv_chart(df):
         xaxis_title="Date",
         template="plotly_white",
         height=400,
-        legend=dict(orientation="h", y=1.1)
+        legend=dict(orientation="h", y=1.1),
+        uirevision='static'
     )
     
     fig.update_yaxes(title_text="OBV", secondary_y=False)
@@ -346,7 +348,11 @@ def obv_chart(df):
     return fig
 
 def volume_chart(df):
-    return px.bar(df, x="Date", y="Volume", title="Trading Volume")
+    fig = px.bar(df, x="Date", y="Volume", title="Trading Volume")
+    fig.update_layout(uirevision='static')
+    return fig
 
 def close_trend(df):
-    return px.line(df, x="Date", y="Close", title="Close Price Trend")
+    fig = px.line(df, x="Date", y="Close", title="Close Price Trend")
+    fig.update_layout(uirevision='static')
+    return fig
