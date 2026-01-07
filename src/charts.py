@@ -3,6 +3,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
 import numpy as np
+from src.patterns import PATTERN_DESCRIPTIONS
 
 def candlestick_chart(df, patterns_df=None, show_patterns=True):
     """
@@ -115,58 +116,90 @@ def candlestick_chart(df, patterns_df=None, show_patterns=True):
     # Add pattern markers if provided and enabled
     if show_patterns and patterns_df is not None and not patterns_df.empty:
         # Get recent patterns from the same dataframe scope as the chart
-        recent_patterns = patterns_df[patterns_df['Date'].isin(df['Date'])]
+        recent_patterns = patterns_df[patterns_df['Date'].isin(df['Date'])].copy()
         
         if not recent_patterns.empty:
-            # Separate patterns by signal for different markers
-            bullish_patterns = recent_patterns[recent_patterns['Signal'] == 'Bullish']
-            bearish_patterns = recent_patterns[recent_patterns['Signal'] == 'Bearish']
+            # --- FILTERING LOGIC ---
+            # 1. Score Filter: Remove low-impact patterns (Score = 1, like Doji)
+            # 2. Trend Filter: Only show Bullish if > VWAP, Bearish if < MA50
+            
+            # Helper to check score
+            def get_score(pat_name):
+                return PATTERN_DESCRIPTIONS.get(pat_name, {}).get("score", 1)
+            
+            recent_patterns["Score"] = recent_patterns["Pattern"].apply(get_score)
+            
+            # Filter 1: Remove weak patterns
+            strong_patterns = recent_patterns[recent_patterns["Score"] > 1]
+            
+            # Merge with indicators for Trend Filter
+            # Ensure we have the necessary columns in df
+            merge_cols = ['Date', 'Close']
+            if "VWAP" in df.columns: merge_cols.append("VWAP")
+            if "MA50" in df.columns: merge_cols.append("MA50")
+            
+            merged = strong_patterns.merge(df[merge_cols], on='Date', how='left')
+            
+            # Filter 2: separate and apply trend logic
+            bullish_mask = (merged['Signal'] == 'Bullish')
+            bearish_mask = (merged['Signal'] == 'Bearish')
+            
+            # Apply Trend Context (User Request: Bull > VWAP, Bear < MA50)
+            if "VWAP" in df.columns:
+                bullish_mask = bullish_mask & (merged['Close'] > merged['VWAP'])
+                
+            if "MA50" in df.columns:
+                bearish_mask = bearish_mask & (merged['Close'] < merged['MA50'])
+            
+            bullish_filtered = merged[bullish_mask]
+            bearish_filtered = merged[bearish_mask]
             
             # Trace for Bullish Patterns (Green Up Triangles)
-            if not bullish_patterns.empty:
-                # Align prices with the main dataframe to get accurate High/Low
-                # We merge with df to get the Low price for positioning
-                bull_merged = bullish_patterns.merge(df[['Date', 'Low']], on='Date', how='left')
+            if not bullish_filtered.empty:
+                # Get Low price for positioning (merge again or use what we have? we need Low)
+                # Optimization: We only merged 'Close' above. Let's grab 'Low' in a mini-merge or map.
+                # Actually simpler to just map it since dates are unique
+                date_to_low = df.set_index('Date')['Low']
+                bull_y = bullish_filtered['Date'].map(date_to_low) * 0.995 # Closer to candle
                 
                 fig.add_trace(
                     go.Scatter(
-                        x=bull_merged['Date'],
-                        y=bull_merged['Low'] * 0.99, # Slightly below low
+                        x=bullish_filtered['Date'],
+                        y=bull_y,
                         mode='markers',
-                        name='Bullish Patterns',
+                        name='Bullish ▲', # Simplified Legend
                         marker=dict(
                             symbol='triangle-up',
-                            size=12,
-                            color='#00c853',
-                            line=dict(width=1, color='white')
+                            size=10, # Smaller
+                            color='rgba(0, 200, 83, 0.7)', # Transparent Green
+                            line=dict(width=1, color='rgba(0, 100, 0, 0.5)')
                         ),
-                        text=bull_merged['Pattern'],
-
-                        customdata=np.stack((bull_merged['Signal'], bull_merged['Status']), axis=-1),
+                        text=bullish_filtered['Pattern'],
+                        customdata=np.stack((bullish_filtered['Signal'], bullish_filtered['Status']), axis=-1),
                         hovertemplate="<b>%{text}</b><br>Signal: %{customdata[0]}<br>Status: %{customdata[1]}<extra></extra>"
                     ),
                     row=1, col=1
                 )
 
             # Trace for Bearish Patterns (Red Down Triangles)
-            if not bearish_patterns.empty:
-                # Merge to get High price for positioning
-                bear_merged = bearish_patterns.merge(df[['Date', 'High']], on='Date', how='left')
+            if not bearish_filtered.empty:
+                date_to_high = df.set_index('Date')['High']
+                bear_y = bearish_filtered['Date'].map(date_to_high) * 1.005 # Closer to candle
                 
                 fig.add_trace(
                     go.Scatter(
-                        x=bear_merged['Date'],
-                        y=bear_merged['High'] * 1.01, # Slightly above high
+                        x=bearish_filtered['Date'],
+                        y=bear_y,
                         mode='markers',
-                        name='Bearish Patterns',
+                        name='Bearish ▼', # Simplified Legend
                         marker=dict(
                             symbol='triangle-down',
-                            size=12,
-                            color='#d50000',
-                            line=dict(width=1, color='white')
+                            size=10, # Smaller
+                            color='rgba(213, 0, 0, 0.7)', # Transparent Red
+                            line=dict(width=1, color='rgba(100, 0, 0, 0.5)')
                         ),
-                        text=bear_merged['Pattern'],
-                        customdata=np.stack((bear_merged['Signal'], bear_merged['Status']), axis=-1),
+                        text=bearish_filtered['Pattern'],
+                        customdata=np.stack((bearish_filtered['Signal'], bearish_filtered['Status']), axis=-1),
                         hovertemplate="<b>%{text}</b><br>Signal: %{customdata[0]}<br>Status: %{customdata[1]}<extra></extra>"
                     ),
                     row=1, col=1

@@ -338,16 +338,31 @@ def get_pattern_insights(patterns_df, df):
         signal = latest_pattern['Signal']
         
         # Context-Aware Advise
+        # Context-Aware Advise
+        # Check Trend Alignment (Price > VWAP and Price > MA50)
+        # Note: df contains the full data with indicators
+        latest_close = df["Close"].iloc[-1]
+        vwap = df["VWAP"].iloc[-1] if "VWAP" in df.columns else latest_close
+        ma50 = df["MA50"].iloc[-1] if "MA50" in df.columns else latest_close
+        
+        is_uptrend = (latest_close > vwap) and (latest_close > ma50)
+        is_downtrend = (latest_close < vwap) and (latest_close < ma50)
+        
         if signal == 'Bullish':
-            if "Bullish" in trend:
-                action = "✅ Strong Buy Signal (Pattern aligns with Trend)"
+            if is_uptrend:
+                action = "✅ Strong Buy Signal (Pattern aligns with Trend) - Watch for confirmation"
+            elif is_downtrend:
+                action = "⚠️ Contratrend Buy Signal (Down Trend - High Risk) - Wait for strong reversal"
             else:
-                action = "⚠️ Contratrend Buy Signal (High Risk - Wait for Confirmation)"
+                action = "🤔 Tactical Buy (Neutral/Mixed Trend) - Watch for confirmation"
+                
         elif signal == 'Bearish':
-            if "Bearish" in trend:
-                action = "✅ Strong Sell Signal (Pattern aligns with Trend)"
+            if is_downtrend:
+                action = "✅ Strong Sell Signal (Pattern aligns with Trend) - Watch for confirmation"
+            elif is_uptrend:
+                action = "⚠️ Contratrend Sell Signal (Up Trend - Potential Pullback) - Wait for confirmation"
             else:
-                action = "⚠️ Contratrend Sell Signal (Potential Pullback in Uptrend)"
+                action = "🤔 Tactical Sell (Neutral/Mixed Trend) - Watch for confirmation"
         
         recommendations.append({
             "pattern": pattern_name,
