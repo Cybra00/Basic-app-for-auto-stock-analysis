@@ -2,52 +2,61 @@
 import pandas as pd
 import numpy as np
 
-# Pattern descriptions for end users
+# Pattern descriptions for end users with ADDED SCORES (1=Weak, 2=Medium, 3=Strong)
 PATTERN_DESCRIPTIONS = {
     "Doji": {
         "description": "A Doji represents market indecision. The open and close prices are nearly equal, creating a cross-like appearance.",
         "meaning": "Indicates uncertainty and potential reversal. Traders should wait for confirmation before making decisions.",
-        "reliability": "Medium - Requires confirmation from next candle"
+        "reliability": "Medium - Requires confirmation from next candle",
+        "score": 1
     },
     "Hammer": {
         "description": "A bullish reversal pattern with a small body at the top and a long lower shadow (at least twice the body size).",
         "meaning": "Suggests buyers are stepping in after a decline. Often signals a potential upward reversal, especially after a downtrend.",
-        "reliability": "High - Strong bullish reversal signal"
+        "reliability": "High - Strong bullish reversal signal",
+        "score": 3
     },
     "Shooting Star": {
         "description": "A bearish reversal pattern with a small body at the bottom and a long upper shadow (at least twice the body size).",
         "meaning": "Indicates sellers are taking control after an uptrend. Suggests potential downward reversal.",
-        "reliability": "High - Strong bearish reversal signal"
+        "reliability": "High - Strong bearish reversal signal",
+        "score": 3
     },
     "Bullish Engulfing": {
         "description": "A two-candle pattern where a large bullish candle completely engulfs the previous bearish candle.",
         "meaning": "Shows strong buying pressure overwhelming sellers. Indicates potential trend reversal from bearish to bullish.",
-        "reliability": "High - Very strong bullish reversal signal"
+        "reliability": "High - Very strong bullish reversal signal",
+        "score": 3
     },
     "Bearish Engulfing": {
         "description": "A two-candle pattern where a large bearish candle completely engulfs the previous bullish candle.",
         "meaning": "Shows strong selling pressure overwhelming buyers. Indicates potential trend reversal from bullish to bearish.",
-        "reliability": "High - Very strong bearish reversal signal"
+        "reliability": "High - Very strong bearish reversal signal",
+        "score": 3
     },
     "Bullish Marubozu": {
         "description": "A strong bullish candle with no shadows - opens at the low and closes at the high.",
         "meaning": "Indicates strong buying pressure throughout the session. Suggests continuation of upward momentum.",
-        "reliability": "Medium - Strong continuation signal"
+        "reliability": "Medium - Strong continuation signal",
+        "score": 2
     },
     "Bearish Marubozu": {
         "description": "A strong bearish candle with no shadows - opens at the high and closes at the low.",
         "meaning": "Indicates strong selling pressure throughout the session. Suggests continuation of downward momentum.",
-        "reliability": "Medium - Strong continuation signal"
+        "reliability": "Medium - Strong continuation signal",
+        "score": 2
     },
     "Morning Star": {
         "description": "A three-candle bullish reversal pattern: bearish candle, small body (star), then large bullish candle.",
         "meaning": "Signals potential reversal from downtrend to uptrend. The 'star' represents indecision before the bullish move.",
-        "reliability": "High - Strong bullish reversal signal"
+        "reliability": "High - Strong bullish reversal signal",
+        "score": 3
     },
     "Evening Star": {
         "description": "A three-candle bearish reversal pattern: bullish candle, small body (star), then large bearish candle.",
         "meaning": "Signals potential reversal from uptrend to downtrend. The 'star' represents indecision before the bearish move.",
-        "reliability": "High - Strong bearish reversal signal"
+        "reliability": "High - Strong bearish reversal signal",
+        "score": 3
     }
 }
 
@@ -74,7 +83,6 @@ def detect_candlestick_patterns(df):
         
         # Extract date and OHLC values explicitly
         current_date = current_row["Date"]
-        prev_date = prev_row["Date"]
         
         # Current candle OHLC (calculated from date-ordered data)
         open_price = float(current_row["Open"])
@@ -211,12 +219,12 @@ def detect_candlestick_patterns(df):
 
 def get_pattern_insights(patterns_df, df):
     """
-    Generate comprehensive insights from detected candlestick patterns.
+    Generate comprehensive insights from detected candlestick patterns using WEIGHTED SCORING.
     Returns a dictionary with insights and statistics.
     """
     if patterns_df.empty:
         return {
-            "summary": "No significant candlestick patterns detected in recent data.",
+            "summary": "No significant candlestick patterns detected in the current data window.",
             "sentiment": "Neutral",
             "bullish_count": 0,
             "bearish_count": 0,
@@ -226,106 +234,137 @@ def get_pattern_insights(patterns_df, df):
             "recommendations": []
         }
     
-    # Calculate TOTAL counts for dashboard consistency
+    # 1. Count Totals (for basic UI display)
     total_bullish = len(patterns_df[patterns_df["Signal"] == "Bullish"])
     total_bearish = len(patterns_df[patterns_df["Signal"] == "Bearish"])
     total_neutral = len(patterns_df[patterns_df["Signal"] == "Neutral"])
 
-    # Get recent patterns (last 20 for better analysis)
-    recent_patterns = patterns_df.tail(20)
+    # 2. Get Recent Patterns (Focus on last 20 for scoring)
+    recent_patterns = patterns_df.tail(20).copy()
     
-    # Count RECENT pattern types for SENTIMENT analysis
-    recent_bullish = len(recent_patterns[recent_patterns["Signal"] == "Bullish"])
-    recent_bearish = len(recent_patterns[recent_patterns["Signal"] == "Bearish"])
-    
-    # --- Sentiment Analysis & Logic Optimization ---
-    # Calculate Base Score from Pattern Counts
+    # --- WEIGHTED SCORING LOGIC ---
     sentiment_score = 0
-    sentiment_score += recent_bullish * 1  # Base value for bullish patterns
-    sentiment_score -= recent_bearish * 1  # Base value for bearish patterns
     
-    # --- Integration of Trend (Optimization) ---
-    # We check if the price is above or below the 50-day Moving Average (MA50)
-    # If MA50 is not pre-calculated, we calculate it on the fly.
+    # Identify the VERY LATEST date in the data (for recency boost)
+    latest_data_date = df["Date"].max()
     
+    for _, row in recent_patterns.iterrows():
+        pattern_name = row["Pattern"]
+        signal = row["Signal"]
+        
+        # Get Pattern Score (Default to 1 if not found)
+        p_info = PATTERN_DESCRIPTIONS.get(pattern_name, {"score": 1})
+        p_score = p_info.get("score", 1)
+        
+        # Recency Multiplier: Double points if pattern is on the LATEST candle
+        recency_mult = 1.0
+        if row["Date"] == latest_data_date:
+            recency_mult = 2.0
+        
+        # Calculate contribution
+        if signal == "Bullish":
+            sentiment_score += (p_score * recency_mult)
+        elif signal == "Bearish":
+            sentiment_score -= (p_score * recency_mult)
+            
+    # --- 3. TREND & MOMENTUM ANALYSIS ---
+    # Safe Trend Calculation (Handles short CSVs)
     latest_close = df.iloc[-1]["Close"]
+    latest_open = df.iloc[-1]["Open"]
     
-    # Safe check for MA50
-    if "MA50" in df.columns:
-        ma_50 = df.iloc[-1]["MA50"]
-    else:
-        # Calculate MA50 if missing
-        ma_50 = df["Close"].rolling(window=50).mean().iloc[-1]
-    
-    # If we have a valid MA, use it for trend context
     trend = "Neutral"
-    if not pd.isna(ma_50):
+    trend_score_mod = 0
+    
+    if len(df) >= 50:
+        ma_50 = df["Close"].rolling(window=50).mean().iloc[-1]
         if latest_close > ma_50:
             trend = "Bullish"
-            # Trend Bonus: Easier to be bullish in an uptrend
-            sentiment_score += 2
+            trend_score_mod = 3
         else:
             trend = "Bearish"
-            # Trend Penalty: Harder to be bullish in a downtrend
-            sentiment_score -= 2
+            trend_score_mod = -3
+    elif len(df) >= 20: # Fallback for shorter data
+        ma_20 = df["Close"].rolling(window=20).mean().iloc[-1]
+        if latest_close > ma_20:
+            trend = "Bullish (Short-term)"
+            trend_score_mod = 2
+        else:
+            trend = "Bearish (Short-term)"
+            trend_score_mod = -2
             
+    # Add Trend modifier to sentiment
+    sentiment_score += trend_score_mod
+    
+    # --- 4. MOMENTUM VETO (CRITICAL FIX) ---
+    # If the latest candle receives a strong negative move (Red Candle), 
+    # we CANNOT call it "Strongly Bullish" regardless of history.
+    
+    is_red_candle = latest_close < latest_open
+    is_green_candle = latest_close > latest_open
+    
     # --- Final Sentiment Classification ---
-    if sentiment_score >= 3:
+    if sentiment_score >= 8:
         sentiment = "Strongly Bullish"
-    elif sentiment_score > 0:
+        # VETO: Downgrade if today is RED
+        if is_red_candle:
+            sentiment = "Bullish (but Short-term Pullback)"
+            
+    elif sentiment_score >= 3:
         sentiment = "Bullish"
-    elif sentiment_score <= -3:
+         # VETO check
+        if is_red_candle:
+            sentiment = "Bullish (Weak Follow-through)"
+            
+    elif sentiment_score <= -8:
         sentiment = "Strongly Bearish"
-    elif sentiment_score < 0:
+        # VETO: Downgrade if today is GREEN (Dead cat bounce potential)
+        if is_green_candle:
+             sentiment = "Bearish (with Short-term Bounce)"
+             
+    elif sentiment_score <= -3:
         sentiment = "Bearish"
     else:
         sentiment = "Mixed/Neutral"
     
-    # Latest pattern
+    # Recommendations Logic
     latest_pattern = recent_patterns.iloc[-1] if not recent_patterns.empty else None
-    
-    # Pattern frequency
-    pattern_counts = recent_patterns["Pattern"].value_counts().to_dict()
-    
-    # Generate recommendations
     recommendations = []
+    
     if latest_pattern is not None:
         pattern_name = latest_pattern['Pattern']
-        if pattern_name in PATTERN_DESCRIPTIONS:
-            desc = PATTERN_DESCRIPTIONS[pattern_name]
-            # context-aware recommendation logic
-            action = "Watch for confirmation"
-            signal = latest_pattern['Signal']
-            
-            if signal == 'Neutral':
-                action = "Watch for confirmation (Neutral Pattern)"
-            elif signal == 'Bullish':
-                if trend == 'Bullish':
-                    action = "✅ Strong Buy: Pattern confirms Uptrend"
-                else:
-                    action = "⚠️ Caution: Bullish pattern in Downtrend (Counter-trend risk)"
-            elif signal == 'Bearish':
-                if trend == 'Bearish':
-                    action = "✅ Strong Sell: Pattern confirms Downtrend"
-                else:
-                    action = "⚠️ Caution: Bearish pattern in Uptrend (Potential Pullback)"
-            
-            recommendations.append({
-                "pattern": pattern_name,
-                "action": action,
-                "description": desc["description"],
-                "meaning": desc["meaning"],
-                "reliability": desc["reliability"]
-            })
+        p_desc = PATTERN_DESCRIPTIONS.get(pattern_name, {})
+        
+        action = "Watch for confirmation"
+        signal = latest_pattern['Signal']
+        
+        # Context-Aware Advise
+        if signal == 'Bullish':
+            if "Bullish" in trend:
+                action = "✅ Strong Buy Signal (Pattern aligns with Trend)"
+            else:
+                action = "⚠️ Contratrend Buy Signal (High Risk - Wait for Confirmation)"
+        elif signal == 'Bearish':
+            if "Bearish" in trend:
+                action = "✅ Strong Sell Signal (Pattern aligns with Trend)"
+            else:
+                action = "⚠️ Contratrend Sell Signal (Potential Pullback in Uptrend)"
+        
+        recommendations.append({
+            "pattern": pattern_name,
+            "action": action,
+            "description": p_desc.get("description", ""),
+            "meaning": p_desc.get("meaning", ""),
+            "reliability": p_desc.get("reliability", "")
+        })
+        
+    # Pattern frequency for chart
+    pattern_counts = recent_patterns["Pattern"].value_counts().to_dict()
     
-    # Summary text
+    # Construct Summary
     summary_parts = []
-    if total_bullish > 0 or total_bearish > 0:
-        summary_parts.append(f"**Market Sentiment**: {sentiment}")
-        summary_parts.append(f"Detected {total_bullish} bullish, {total_bearish} bearish, and {total_neutral} neutral patterns in TOTAL data.")
-    
-    if latest_pattern is not None:
-        summary_parts.append(f"**Latest Pattern**: {latest_pattern['Pattern']} on {latest_pattern['Date'].strftime('%Y-%m-%d')} at ₹{latest_pattern['Price']:.2f}")
+    summary_parts.append(f"**Market Bias**: {sentiment}")
+    summary_parts.append(f"**Trend Context**: {trend}")
+    summary_parts.append(f"**Momentum**: {'Bearish (Price Drop)' if is_red_candle else 'Bullish (Price Rise)' if is_green_candle else 'Neutral'}")
     
     return {
         "summary": "\n\n".join(summary_parts),
@@ -349,4 +388,3 @@ def get_pattern_description(pattern_name):
         "meaning": "Unknown pattern meaning.",
         "reliability": "Unknown"
     })
-

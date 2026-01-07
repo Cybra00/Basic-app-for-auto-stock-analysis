@@ -34,7 +34,7 @@ if data_source == "Upload CSV":
         st.stop()
         
 else: # Live Ticker
-    ticker = st.sidebar.text_input("Enter Ticker Symbol (e.g. RELIANCE.NS, ^NSEI)", value="^NSEI")
+    ticker = st.sidebar.text_input("Enter Ticker Symbol (e.g. RELIANCE.NS)", value="")
     # Valid intervals and periods map
     valid_periods = {
         "1m": ["1d", "5d", "7d"],
