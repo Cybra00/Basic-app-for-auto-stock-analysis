@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 
 import time
+from datetime import datetime, timedelta
+import pytz
 from src.loader import load_stock_data, fetch_live_data
 from src.kpis import compute_kpis
 from src.indicators import add_indicators
@@ -14,7 +16,7 @@ st.title("📈 Stock KPI Auto-Analysis Dashboard (v2.1 DEBUG)")
 
 # --- CSV Upload ---
 # --- Data Source Selection ---
-data_source = st.sidebar.radio("Data Source", ["Upload CSV", "Live Ticker"], index=0)
+data_source = st.sidebar.radio("Data Source", ["Upload CSV", "Live Ticker"], index=1)
 
 if 'stock_data' not in st.session_state:
     st.session_state['stock_data'] = pd.DataFrame()
@@ -117,6 +119,38 @@ col1.metric("Latest Price", f"₹{kpis['latest_price']:.2f}")
 col2.metric("Daily Return", f"{kpis['daily_return_pct']:.2f}%")
 col3.metric("52W High", f"₹{kpis['high_52w']:.2f}")
 col4.metric("Volatility", f"{kpis['volatility_pct']:.2f}%")
+
+# --- Data Freshness Check ---
+last_update = df["Date"].max()
+# Ensure last_update is timezone-aware if possible, assuming IST for 'NS' tickers
+# Simple check: compare with current UTC if tz-aware, or naive
+now = pd.Timestamp.now()
+try:
+    if last_update.tzinfo is None:
+        pass # Treat as naive local
+    else:
+        now = pd.Timestamp.now(tz=last_update.tzinfo)
+except:
+    pass
+
+time_diff = now - last_update
+minutes_diff = time_diff.total_seconds() / 60
+
+# Display Data Status
+st.markdown("### 🕒 Data Status")
+status_cols = st.columns([2, 5])
+with status_cols[0]:
+    st.write(f"**Last Candle**: {last_update.strftime('%Y-%m-%d %H:%M')}")
+
+with status_cols[1]:
+    if minutes_diff < 5:
+        st.success(f"🟢 Real-time Data (< 5 min old)")
+    elif minutes_diff < 20:
+        st.warning(f"⚠️ Delayed Data ({int(minutes_diff)} min old) - Standard for Free Feeds")
+    elif minutes_diff < 1440: # Less than a day
+        st.warning(f"⚠️ Market Closed / Data Old ({int(minutes_diff // 60)}h {int(minutes_diff % 60)}m ago)")
+    else:
+        st.error(f"🔴 Historical Data ({int(minutes_diff // 1440)} days old)")
 
 # --- Candlestick Pattern Detection (Summary) ---
 st.subheader("🕯️ Candlestick Pattern Detection & Analysis")
