@@ -62,17 +62,23 @@ PATTERN_DESCRIPTIONS = {
 
 def detect_candlestick_patterns(df):
     """
-    Detect common candlestick patterns in stock data.
+    Detect common candlestick patterns in stock data using VOLATILITY-ADAPTIVE THRESHOLDS.
     Ensures OHLC values are calculated based on proper date ordering.
     Returns a DataFrame with pattern detections and insights.
     """
     # Ensure dataframe is sorted by date and reset index
-    df_sorted = df.sort_values("Date").reset_index(drop=True)
+    df_sorted = df.sort_values("Date").reset_index(drop=True).copy()
     
     # Verify required columns exist
     required_cols = ["Date", "Open", "High", "Low", "Close"]
     if not all(col in df_sorted.columns for col in required_cols):
         return pd.DataFrame(columns=["Date", "Pattern", "Type", "Signal", "Price"])
+    
+    # --- PRE-CALCULATION: Volatility-Adaptive Thresholds ---
+    df_sorted['Body'] = (df_sorted['Close'] - df_sorted['Open']).abs()
+    df_sorted['Range'] = df_sorted['High'] - df_sorted['Low']
+    df_sorted['Avg_Body'] = df_sorted['Body'].rolling(window=14, min_periods=1).mean()
+    df_sorted['Avg_Range'] = df_sorted['Range'].rolling(window=14, min_periods=1).mean()
     
     patterns = []
     
@@ -84,43 +90,48 @@ def detect_candlestick_patterns(df):
         # Extract date and OHLC values explicitly
         current_date = current_row["Date"]
         
-        # Current candle OHLC (calculated from date-ordered data)
+        # Current candle OHLC
         open_price = float(current_row["Open"])
         close_price = float(current_row["Close"])
         high_price = float(current_row["High"])
         low_price = float(current_row["Low"])
         
-        # Previous candle OHLC (calculated from date-ordered data)
+        # Previous candle OHLC
         prev_open = float(prev_row["Open"])
         prev_close = float(prev_row["Close"])
         prev_high = float(prev_row["High"])
         prev_low = float(prev_row["Low"])
         
+        # Volatility context
+        avg_body = float(current_row["Avg_Body"]) if current_row["Avg_Body"] > 0 else 0.001
+        avg_range = float(current_row["Avg_Range"]) if current_row["Avg_Range"] > 0 else 0.001
+        
         # Validate data integrity
         if not (low_price <= min(open_price, close_price) <= high_price and
                 low_price <= max(open_price, close_price) <= high_price):
-            continue  # Skip invalid OHLC data
+            continue
         
         if not (prev_low <= min(prev_open, prev_close) <= prev_high and
                 prev_low <= max(prev_open, prev_close) <= prev_high):
-            continue  # Skip if previous candle has invalid data
+            continue
         
         body = abs(close_price - open_price)
         upper_shadow = high_price - max(open_price, close_price)
         lower_shadow = min(open_price, close_price) - low_price
         total_range = high_price - low_price
         
-        # Avoid division by zero
         if total_range == 0:
             continue
             
-        body_ratio = body / total_range if total_range > 0 else 0
+        body_ratio = body / total_range
         
         detected_pattern = None
         pattern_type = None
         signal = None
         
-        # Check 3-candle patterns first (they have priority)
+        # =================================================================
+        # CHECK 3-CANDLE PATTERNS FIRST (Highest Priority)
+        # =================================================================
         if i >= 2:
             prev_prev_row = df_sorted.iloc[i-2]
             prev_prev_open = float(prev_prev_row["Open"])
@@ -128,69 +139,99 @@ def detect_candlestick_patterns(df):
             prev_prev_body = abs(prev_prev_close - prev_prev_open)
             prev_body = abs(prev_close - prev_open)
             
-            # 7. Morning Star (3-candle pattern - highest priority)
-            if (prev_prev_close < prev_prev_open and  # First candle bearish
-                prev_body < prev_prev_body * 0.5 and  # Second candle has small body (star)
-                close_price > open_price and  # Third candle bullish
-                close_price > (prev_prev_open + prev_prev_close) / 2):  # Closes above midpoint
+            # STRICT Morning Star:
+            # 1. First candle: Big bearish (Body > 0.8 * Avg)
+            # 2. Star: Small body indecision (Body < 0.5 * Avg)
+            # 3. Third: Big bullish reversal (Body > 0.8 * Avg)
+            if (prev_prev_close < prev_prev_open and  # First bearish
+                prev_prev_body > 0.8 * avg_body and  # SIGNIFICANCE: First is big
+                prev_body < 0.5 * avg_body and  # SIGNIFICANCE: Star is small
+                close_price > open_price and  # Third bullish
+                body > 0.8 * avg_body and  # SIGNIFICANCE: Third is big
+                close_price > (prev_prev_open + prev_prev_close) / 2):
                 detected_pattern = "Morning Star"
                 pattern_type = "Bullish Reversal"
                 signal = "Bullish"
             
-            # 8. Evening Star (3-candle pattern - highest priority)
-            elif (prev_prev_close > prev_prev_open and  # First candle bullish
-                  prev_body < prev_prev_body * 0.5 and  # Second candle has small body (star)
-                  close_price < open_price and  # Third candle bearish
-                  close_price < (prev_prev_open + prev_prev_close) / 2):  # Closes below midpoint
+            # STRICT Evening Star:
+            elif (prev_prev_close > prev_prev_open and  # First bullish
+                  prev_prev_body > 0.8 * avg_body and  # SIGNIFICANCE: First is big
+                  prev_body < 0.5 * avg_body and  # SIGNIFICANCE: Star is small
+                  close_price < open_price and  # Third bearish
+                  body > 0.8 * avg_body and  # SIGNIFICANCE: Third is big
+                  close_price < (prev_prev_open + prev_prev_close) / 2):
                 detected_pattern = "Evening Star"
                 pattern_type = "Bearish Reversal"
                 signal = "Bearish"
         
-        # Check 2-candle patterns (engulfing patterns)
+        # =================================================================
+        # CHECK 2-CANDLE PATTERNS (Engulfing)
+        # =================================================================
         if detected_pattern is None:
-            # 4. Bullish Engulfing
-            if (prev_close < prev_open and  # Previous was bearish
-                close_price > open_price and  # Current is bullish
-                open_price < prev_close and  # Current opens below prev close
-                close_price > prev_open):  # Current closes above prev open
+            prev_body_val = abs(prev_close - prev_open)
+            
+            # STRICT Bullish Engulfing:
+            # 1. Geometry: Engulfs previous body
+            # 2. Significance: Current body > 0.8 * Avg
+            if (prev_close < prev_open and  # Previous bearish
+                close_price > open_price and  # Current bullish
+                open_price < prev_close and  # Opens below prev close
+                close_price > prev_open and  # Closes above prev open
+                body > 0.8 * avg_body):  # SIGNIFICANCE CHECK
                 detected_pattern = "Bullish Engulfing"
                 pattern_type = "Bullish Reversal"
                 signal = "Bullish"
             
-            # 5. Bearish Engulfing
-            elif (prev_close > prev_open and  # Previous was bullish
-                  close_price < open_price and  # Current is bearish
-                  open_price > prev_close and  # Current opens above prev close
-                  close_price < prev_open):  # Current closes below prev open
+            # STRICT Bearish Engulfing:
+            elif (prev_close > prev_open and  # Previous bullish
+                  close_price < open_price and  # Current bearish
+                  open_price > prev_close and  # Opens above prev close
+                  close_price < prev_open and  # Closes below prev open
+                  body > 0.8 * avg_body):  # SIGNIFICANCE CHECK
                 detected_pattern = "Bearish Engulfing"
                 pattern_type = "Bearish Reversal"
                 signal = "Bearish"
         
-        # Check single-candle patterns
+        # =================================================================
+        # CHECK SINGLE-CANDLE PATTERNS
+        # =================================================================
         if detected_pattern is None:
-            # 1. Doji Pattern (Indecision) - very small body
+            # 1. Doji Pattern (Indecision) - very small body relative to range
+            # No significance check needed (Dojis are inherently weak)
             if body_ratio < 0.1 and total_range > 0:
                 detected_pattern = "Doji"
                 pattern_type = "Indecision"
                 signal = "Neutral"
             
-            # 2. Hammer (Bullish Reversal) - long lower shadow, small upper shadow
-            elif (body > 0 and lower_shadow >= 2 * body and 
-                  upper_shadow <= body * 0.5):
+            # 2. STRICT Hammer:
+            # - Geometry: Lower shadow >= 2x body, upper shadow <= 10% of body
+            # - Significance: Total Range > 0.8 * Avg Range
+            elif (body > 0 and 
+                  lower_shadow >= 2 * body and 
+                  upper_shadow <= body * 0.1 and  # Stricter: 10% not 50%
+                  total_range > 0.8 * avg_range):  # SIGNIFICANCE CHECK
                 detected_pattern = "Hammer"
                 pattern_type = "Bullish Reversal"
                 signal = "Bullish"
             
-            # 3. Shooting Star (Bearish Reversal) - long upper shadow, small lower shadow
-            elif (body > 0 and upper_shadow >= 2 * body and 
-                  lower_shadow <= body * 0.5):
+            # 3. STRICT Shooting Star:
+            # - Geometry: Upper shadow >= 2x body, lower shadow <= 10% of body
+            # - Significance: Total Range > 0.8 * Avg Range
+            elif (body > 0 and 
+                  upper_shadow >= 2 * body and 
+                  lower_shadow <= body * 0.1 and  # Stricter: 10% not 50%
+                  total_range > 0.8 * avg_range):  # SIGNIFICANCE CHECK
                 detected_pattern = "Shooting Star"
                 pattern_type = "Bearish Reversal"
                 signal = "Bearish"
             
-            # 6. Marubozu (Strong Trend) - very large body, minimal shadows
-            # Strict Definition: >98% Body (No visible wicks)
-            elif body_ratio > 0.98:
+            # 4. STRICT Marubozu:
+            # - Shadows: Both < 3% of body (virtually zero wicks)
+            # - Significance: Body > 1.2 * Avg Body (Must be a "Long Day")
+            elif (body_ratio > 0.97 and  # 97% body
+                  upper_shadow < body * 0.03 and  # Upper < 3% of body
+                  lower_shadow < body * 0.03 and  # Lower < 3% of body
+                  body > 1.2 * avg_body):  # SIGNIFICANCE: Must be bigger than average
                 if close_price > open_price:
                     detected_pattern = "Bullish Marubozu"
                     pattern_type = "Strong Bullish"
@@ -202,7 +243,7 @@ def detect_candlestick_patterns(df):
         
         if detected_pattern:
             patterns.append({
-                "Date": current_date,  # Use explicitly extracted date
+                "Date": current_date,
                 "Pattern": detected_pattern,
                 "Type": pattern_type,
                 "Signal": signal,
@@ -213,7 +254,6 @@ def detect_candlestick_patterns(df):
         return pd.DataFrame(columns=["Date", "Pattern", "Type", "Signal", "Price"])
     
     result_df = pd.DataFrame(patterns)
-    # Ensure dates are datetime type
     result_df["Date"] = pd.to_datetime(result_df["Date"])
     return result_df
 
