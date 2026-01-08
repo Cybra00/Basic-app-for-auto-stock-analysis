@@ -363,17 +363,17 @@ def get_pattern_insights(patterns_df, df):
             close = row['Close']
             
             if signal == 'Bullish':
-                # Show Bullish if > VWAP (or if VWAP missing)
-                vwap = row.get('VWAP', -1)
-                if vwap == -1 or close > vwap:
+                # Show Bullish if > VWAP (or if VWAP missing/NaN)
+                vwap = row.get('VWAP', None)
+                if vwap is None or pd.isna(vwap) or close > vwap:
                     keep_mask.at[idx] = True
             elif signal == 'Bearish':
-                # Show Bearish if < MA50 (or if MA50 missing)
-                ma50 = row.get('MA50', -1)
-                if ma50 == -1 or close < ma50:
+                # Show Bearish if < MA50 (or if MA50 missing/NaN)
+                ma50 = row.get('MA50', None)
+                if ma50 is None or pd.isna(ma50) or close < ma50:
                     keep_mask.at[idx] = True
             else:
-                # Keep Neutral? Using Score > 1 handled basics, but let's keep neutrals if score > 1
+                # Keep Neutral if score > 1
                 keep_mask.at[idx] = True
                 
         filtered_patterns = merged[keep_mask]
