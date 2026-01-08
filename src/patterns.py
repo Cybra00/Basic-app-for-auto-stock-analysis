@@ -189,7 +189,8 @@ def detect_candlestick_patterns(df):
                 signal = "Bearish"
             
             # 6. Marubozu (Strong Trend) - very large body, minimal shadows
-            elif body_ratio > 0.9:
+            # Strict Definition: >98% Body (No visible wicks)
+            elif body_ratio > 0.98:
                 if close_price > open_price:
                     detected_pattern = "Bullish Marubozu"
                     pattern_type = "Strong Bullish"
@@ -282,13 +283,55 @@ def get_pattern_insights(patterns_df, df):
             "recommendations": []
         }
     
+    # --- FILTERING LOGIC (Sync with Charts) ---
+    # 1. Score Filter: Remove low-impact patterns (Score = 1, like Doji)
+    def get_score(pat_name):
+        return PATTERN_DESCRIPTIONS.get(pat_name, {}).get("score", 1)
+    
+    patterns_df = patterns_df.copy()
+    patterns_df["Score"] = patterns_df["Pattern"].apply(get_score)
+    filtered_patterns = patterns_df[patterns_df["Score"] > 1].copy()
+    
+    # 2. Trend Filter: Match visual chart logic
+    if not filtered_patterns.empty:
+        # Merge with indicators
+        merge_cols = ['Date', 'Close']
+        if "VWAP" in df.columns: merge_cols.append("VWAP")
+        if "MA50" in df.columns: merge_cols.append("MA50")
+        
+        merged = filtered_patterns.merge(df[merge_cols], on='Date', how='left')
+        
+        # Apply Logic
+        keep_mask = pd.Series(False, index=merged.index)
+        
+        for idx, row in merged.iterrows():
+            signal = row['Signal']
+            close = row['Close']
+            
+            if signal == 'Bullish':
+                # Show Bullish if > VWAP (or if VWAP missing)
+                vwap = row.get('VWAP', -1)
+                if vwap == -1 or close > vwap:
+                    keep_mask.at[idx] = True
+            elif signal == 'Bearish':
+                # Show Bearish if < MA50 (or if MA50 missing)
+                ma50 = row.get('MA50', -1)
+                if ma50 == -1 or close < ma50:
+                    keep_mask.at[idx] = True
+            else:
+                # Keep Neutral? Using Score > 1 handled basics, but let's keep neutrals if score > 1
+                keep_mask.at[idx] = True
+                
+        filtered_patterns = merged[keep_mask]
+    
+    # USE FILTERED PATTERNS FOR COUNTS AND INSIGHTS
     # 1. Count Totals (for basic UI display)
-    total_bullish = len(patterns_df[patterns_df["Signal"] == "Bullish"])
-    total_bearish = len(patterns_df[patterns_df["Signal"] == "Bearish"])
-    total_neutral = len(patterns_df[patterns_df["Signal"] == "Neutral"])
+    total_bullish = len(filtered_patterns[filtered_patterns["Signal"] == "Bullish"])
+    total_bearish = len(filtered_patterns[filtered_patterns["Signal"] == "Bearish"])
+    total_neutral = len(filtered_patterns[filtered_patterns["Signal"] == "Neutral"])
 
-    # 2. Get Recent Patterns (Focus on last 20 for scoring)
-    recent_patterns = patterns_df.tail(20).copy()
+    # 2. Get Recent Patterns (Focus on last 20 VALID patterns for scoring)
+    recent_patterns = filtered_patterns.tail(20).copy()
     
     # --- WEIGHTED SCORING LOGIC ---
     sentiment_score = 0
@@ -300,9 +343,8 @@ def get_pattern_insights(patterns_df, df):
         pattern_name = row["Pattern"]
         signal = row["Signal"]
         
-        # Get Pattern Score (Default to 1 if not found)
-        p_info = PATTERN_DESCRIPTIONS.get(pattern_name, {"score": 1})
-        p_score = p_info.get("score", 1)
+        # Get Pattern Score (already in row from filter step, but re-get to be safe or use row['Score'])
+        p_score = row["Score"]
         
         # Recency Multiplier: Double points if pattern is on the LATEST candle
         recency_mult = 1.0
