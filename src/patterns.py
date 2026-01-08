@@ -106,6 +106,11 @@ def detect_candlestick_patterns(df):
         avg_body = float(current_row["Avg_Body"]) if current_row["Avg_Body"] > 0 else 0.001
         avg_range = float(current_row["Avg_Range"]) if current_row["Avg_Range"] > 0 else 0.001
         
+        # ABSOLUTE MINIMUM: Body must be > 0.3% of price to be "significant"
+        # This prevents tiny candles in consolidation zones from being detected
+        min_body_pct = 0.003
+        min_body_abs = close_price * min_body_pct
+        
         # Validate data integrity
         if not (low_price <= min(open_price, close_price) <= high_price and
                 low_price <= max(open_price, close_price) <= high_price):
@@ -144,9 +149,11 @@ def detect_candlestick_patterns(df):
             # 2. Star: Small body indecision (Body < 0.5 * Avg)
             # 3. Third: Big bullish reversal (Body > 0.8 * Avg)
             if (prev_prev_close < prev_prev_open and  # First bearish
+                prev_prev_body > min_body_abs and  # ABSOLUTE: First must be meaningful
                 prev_prev_body > 0.8 * avg_body and  # SIGNIFICANCE: First is big
                 prev_body < 0.5 * avg_body and  # SIGNIFICANCE: Star is small
                 close_price > open_price and  # Third bullish
+                body > min_body_abs and  # ABSOLUTE: Third must be meaningful
                 body > 0.8 * avg_body and  # SIGNIFICANCE: Third is big
                 close_price > (prev_prev_open + prev_prev_close) / 2):
                 detected_pattern = "Morning Star"
@@ -155,9 +162,11 @@ def detect_candlestick_patterns(df):
             
             # STRICT Evening Star:
             elif (prev_prev_close > prev_prev_open and  # First bullish
+                  prev_prev_body > min_body_abs and  # ABSOLUTE: First must be meaningful
                   prev_prev_body > 0.8 * avg_body and  # SIGNIFICANCE: First is big
                   prev_body < 0.5 * avg_body and  # SIGNIFICANCE: Star is small
                   close_price < open_price and  # Third bearish
+                  body > min_body_abs and  # ABSOLUTE: Third must be meaningful
                   body > 0.8 * avg_body and  # SIGNIFICANCE: Third is big
                   close_price < (prev_prev_open + prev_prev_close) / 2):
                 detected_pattern = "Evening Star"
@@ -177,6 +186,7 @@ def detect_candlestick_patterns(df):
                 close_price > open_price and  # Current bullish
                 open_price < prev_close and  # Opens below prev close
                 close_price > prev_open and  # Closes above prev open
+                body > min_body_abs and  # ABSOLUTE: Must be meaningful
                 body > 0.8 * avg_body):  # SIGNIFICANCE CHECK
                 detected_pattern = "Bullish Engulfing"
                 pattern_type = "Bullish Reversal"
@@ -187,6 +197,7 @@ def detect_candlestick_patterns(df):
                   close_price < open_price and  # Current bearish
                   open_price > prev_close and  # Opens above prev close
                   close_price < prev_open and  # Closes below prev open
+                  body > min_body_abs and  # ABSOLUTE: Must be meaningful
                   body > 0.8 * avg_body):  # SIGNIFICANCE CHECK
                 detected_pattern = "Bearish Engulfing"
                 pattern_type = "Bearish Reversal"
@@ -205,33 +216,36 @@ def detect_candlestick_patterns(df):
             
             # 2. STRICT Hammer:
             # - Geometry: Lower shadow >= 2x body, upper shadow <= 10% of body
-            # - Significance: Total Range > 0.8 * Avg Range
+            # - Significance: Total Range > 0.8 * Avg Range AND Range > min threshold
             elif (body > 0 and 
+                  total_range > min_body_abs and  # ABSOLUTE: Range must be meaningful
                   lower_shadow >= 2 * body and 
-                  upper_shadow <= body * 0.1 and  # Stricter: 10% not 50%
-                  total_range > 0.8 * avg_range):  # SIGNIFICANCE CHECK
+                  upper_shadow <= body * 0.1 and
+                  total_range > 0.8 * avg_range):
                 detected_pattern = "Hammer"
                 pattern_type = "Bullish Reversal"
                 signal = "Bullish"
             
             # 3. STRICT Shooting Star:
             # - Geometry: Upper shadow >= 2x body, lower shadow <= 10% of body
-            # - Significance: Total Range > 0.8 * Avg Range
+            # - Significance: Total Range > 0.8 * Avg Range AND Range > min threshold
             elif (body > 0 and 
+                  total_range > min_body_abs and  # ABSOLUTE: Range must be meaningful
                   upper_shadow >= 2 * body and 
-                  lower_shadow <= body * 0.1 and  # Stricter: 10% not 50%
-                  total_range > 0.8 * avg_range):  # SIGNIFICANCE CHECK
+                  lower_shadow <= body * 0.1 and
+                  total_range > 0.8 * avg_range):
                 detected_pattern = "Shooting Star"
                 pattern_type = "Bearish Reversal"
                 signal = "Bearish"
             
             # 4. STRICT Marubozu:
             # - Shadows: Both < 3% of body (virtually zero wicks)
-            # - Significance: Body > 1.2 * Avg Body (Must be a "Long Day")
-            elif (body_ratio > 0.97 and  # 97% body
-                  upper_shadow < body * 0.03 and  # Upper < 3% of body
-                  lower_shadow < body * 0.03 and  # Lower < 3% of body
-                  body > 1.2 * avg_body):  # SIGNIFICANCE: Must be bigger than average
+            # - Significance: Body > 1.2 * Avg Body AND Body > min threshold
+            elif (body_ratio > 0.97 and
+                  body > min_body_abs and  # ABSOLUTE: Body must be meaningful
+                  upper_shadow < body * 0.03 and
+                  lower_shadow < body * 0.03 and
+                  body > 1.2 * avg_body):
                 if close_price > open_price:
                     detected_pattern = "Bullish Marubozu"
                     pattern_type = "Strong Bullish"
