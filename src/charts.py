@@ -244,7 +244,8 @@ def candlestick_chart(df, patterns_df=None, show_patterns=True, symbol="static")
             spikemode="across",
             spikethickness=1,
             title_font=dict(color="black"),
-            tickfont=dict(color="black")
+            tickfont=dict(color="black"),
+            uirevision=symbol  # Preserve x-axis zoom/pan
         ),
         yaxis=dict(
             title="Price",
@@ -252,7 +253,8 @@ def candlestick_chart(df, patterns_df=None, show_patterns=True, symbol="static")
             gridcolor='rgba(128,128,128,0.2)',
             side="right",
             title_font=dict(color="black"),
-            tickfont=dict(color="black")
+            tickfont=dict(color="black"),
+            uirevision=symbol  # Preserve y-axis zoom/pan
         ),
         yaxis2=dict(
             title="Volume",
@@ -260,9 +262,10 @@ def candlestick_chart(df, patterns_df=None, show_patterns=True, symbol="static")
             gridcolor='rgba(128,128,128,0.1)',
             side="right",
             title_font=dict(color="black"),
-            tickfont=dict(color="black")
+            tickfont=dict(color="black"),
+            uirevision=symbol  # Preserve volume axis state
         ),
-        # Preserve user state (zoom, pan, etc.) as long as 'symbol' remains constant
+        # Preserve user state (zoom, pan, legend visibility) as long as 'symbol' remains constant
         uirevision=symbol 
     )
     
@@ -387,7 +390,9 @@ def volume_analysis_chart(df):
         template="plotly_white",
         height=400,
         legend=dict(orientation="h", y=1.1),
-        uirevision='static'
+        uirevision='volume_analysis',
+        xaxis=dict(uirevision='volume_analysis'),
+        yaxis=dict(uirevision='volume_analysis')
     )
     return fig
 
@@ -415,7 +420,10 @@ def obv_chart(df):
         template="plotly_white",
         height=400,
         legend=dict(orientation="h", y=1.1),
-        uirevision='static'
+        uirevision='obv_chart',
+        xaxis=dict(uirevision='obv_chart'),
+        yaxis=dict(uirevision='obv_chart'),
+        yaxis2=dict(uirevision='obv_chart')
     )
     
     fig.update_yaxes(title_text="OBV", secondary_y=False)
@@ -425,10 +433,18 @@ def obv_chart(df):
 
 def volume_chart(df):
     fig = px.bar(df, x="Date", y="Volume", title="Trading Volume")
-    fig.update_layout(uirevision='static')
+    fig.update_layout(
+        uirevision='volume_bar',
+        xaxis=dict(uirevision='volume_bar'),
+        yaxis=dict(uirevision='volume_bar')
+    )
     return fig
 
 def close_trend(df):
     fig = px.line(df, x="Date", y="Close", title="Close Price Trend")
-    fig.update_layout(uirevision='static')
+    fig.update_layout(
+        uirevision='close_trend',
+        xaxis=dict(uirevision='close_trend'),
+        yaxis=dict(uirevision='close_trend')
+    )
     return fig
