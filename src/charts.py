@@ -209,16 +209,20 @@ def candlestick_chart(df, patterns_df=None, show_patterns=True):
     fig.update_layout(
         title=dict(
             text="<b>Candlestick Chart with Technical Indicators</b>",
+            y=0.98,
             x=0.5,
+            xanchor='center',
+            yanchor='top',
             font=dict(size=20, color="#1f1f1f")
         ),
+        margin=dict(t=160, l=50, r=50, b=50),
         font=dict(color="black"),  # Force global font color to black
-        height=700,
+        height=750,
         showlegend=True,
         legend=dict(
             orientation="h",
             yanchor="bottom",
-            y=1.12,
+            y=1.08,
             xanchor="right",
             x=1,
             bgcolor="rgba(255,255,255,0.8)",
