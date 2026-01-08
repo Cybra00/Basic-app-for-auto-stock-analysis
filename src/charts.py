@@ -218,7 +218,7 @@ def candlestick_chart(df, patterns_df=None, show_patterns=True):
         legend=dict(
             orientation="h",
             yanchor="bottom",
-            y=1.02,
+            y=1.12,
             xanchor="right",
             x=1,
             bgcolor="rgba(255,255,255,0.8)",
