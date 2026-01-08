@@ -1,8 +1,8 @@
-# src/charts.py
 import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
 import numpy as np
+import pandas as pd
 from src.patterns import PATTERN_DESCRIPTIONS
 
 def candlestick_chart(df, patterns_df=None, show_patterns=True, symbol="static"):
@@ -264,6 +264,44 @@ def candlestick_chart(df, patterns_df=None, show_patterns=True, symbol="static")
         ),
         # Preserve user state (zoom, pan, etc.) as long as 'symbol' remains constant
         uirevision=symbol 
+    )
+    
+    # --- ENHANCEMENT: Highlight Breakout Zones ---
+    # Add vertical highlights for Volume Breakouts
+    if "Volume_Breakout" in df.columns:
+        breakout_dates = df[df["Volume_Breakout"]]["Date"]
+        for date in breakout_dates:
+            fig.add_vrect(
+                x0=date - pd.Timedelta(hours=12), # Approximate daily width centering
+                x1=date + pd.Timedelta(hours=12),
+                fillcolor="yellow",
+                opacity=0.1,
+                layer="below",
+                line_width=0,
+                annotation_text="Breakout",
+                annotation_position="top left",
+                annotation_font_size=10,
+                annotation_font_color="rgba(255, 200, 0, 0.8)"
+            )
+
+    # --- ENHANCEMENT: Range Selector (Zoom Buttons) ---
+    fig.update_xaxes(
+        rangeselector=dict(
+            buttons=list([
+                dict(count=1, label="1h", step="hour", stepmode="backward"),
+                dict(count=6, label="6h", step="hour", stepmode="backward"),
+                dict(count=1, label="1d", step="day", stepmode="backward"),
+                dict(count=7, label="1wk", step="day", stepmode="backward"),
+                dict(count=1, label="1m", step="month", stepmode="backward"),
+                dict(count=3, label="3m", step="month", stepmode="backward"),
+                dict(count=6, label="6m", step="month", stepmode="backward"),
+                dict(count=1, label="YTD", step="year", stepmode="todate"),
+                dict(count=1, label="1y", step="year", stepmode="backward"),
+                dict(step="all", label="All")
+            ]),
+            font=dict(color="black")
+        ),
+        row=1, col=1
     )
     
     # Update x-axis for volume subplot
