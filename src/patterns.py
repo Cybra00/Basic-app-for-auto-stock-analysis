@@ -542,7 +542,13 @@ def get_pattern_insights(patterns_df, df):
             "reliability": f"{p_desc.get('reliability', '')} | 📊 Historical Accuracy: {hist_acc}"
         })
         
-    pattern_counts = recent_patterns["Pattern"].value_counts().to_dict()
+    # Use filtered patterns for counts, but fallback to raw patterns if filtering removed everything
+    if not recent_patterns.empty:
+        pattern_counts = recent_patterns["Pattern"].value_counts().to_dict()
+    else:
+        # Fallback: Use raw patterns (score > 1 only, before trend filter)
+        fallback_patterns = patterns_df[patterns_df["Score"] > 1].tail(20)
+        pattern_counts = fallback_patterns["Pattern"].value_counts().to_dict() if not fallback_patterns.empty else {}
     
     # Construct Summary
     summary_parts = []
