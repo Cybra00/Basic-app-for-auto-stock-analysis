@@ -5,7 +5,7 @@ from plotly.subplots import make_subplots
 import numpy as np
 from src.patterns import PATTERN_DESCRIPTIONS
 
-def candlestick_chart(df, patterns_df=None, show_patterns=True):
+def candlestick_chart(df, patterns_df=None, show_patterns=True, symbol="static"):
     """
     Create optimized candlestick chart with moving averages, volume, and pattern annotations.
     
@@ -13,6 +13,7 @@ def candlestick_chart(df, patterns_df=None, show_patterns=True):
         df: DataFrame with OHLCV data and indicators (MA20, MA50)
         patterns_df: Optional DataFrame with detected patterns
         show_patterns: Boolean to toggle pattern annotations (default: True)
+        symbol: Unique identifier for the data source (ticker or filename) controls persistence.
     """
     # Create subplots: candlestick on top, volume on bottom
     fig = make_subplots(
@@ -204,7 +205,7 @@ def candlestick_chart(df, patterns_df=None, show_patterns=True):
                     ),
                     row=1, col=1
                 )
-    
+
     # Update layout for better visibility
     fig.update_layout(
         title=dict(
@@ -261,8 +262,8 @@ def candlestick_chart(df, patterns_df=None, show_patterns=True):
             title_font=dict(color="black"),
             tickfont=dict(color="black")
         ),
-        # Preserve user state (zoom, pan, etc.) on refresh
-        uirevision='static' 
+        # Preserve user state (zoom, pan, etc.) as long as 'symbol' remains constant
+        uirevision=symbol 
     )
     
     # Update x-axis for volume subplot

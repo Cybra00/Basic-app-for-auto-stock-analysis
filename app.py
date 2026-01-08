@@ -204,10 +204,17 @@ else:
     st.info("Stock is consolidating.")
 
 # --- Charts ---
+# Determine chart unique key for persistence
+chart_id = "static"
+if data_source == "Live Ticker" and "ticker" in locals():
+    chart_id = ticker
+elif data_source == "Upload CSV" and "uploaded_file" in locals() and uploaded_file:
+    chart_id = uploaded_file.name
+
 # Add toggle for patterns
 show_patterns = st.checkbox("Show Patterns on Chart", value=True, help="Toggle to show/hide candlestick pattern markers")
 
-st.plotly_chart(candlestick_chart(df, patterns_df, show_patterns=show_patterns), use_container_width=True, key="candlestick_main")
+st.plotly_chart(candlestick_chart(df, patterns_df, show_patterns=show_patterns, symbol=chart_id), use_container_width=True, key="candlestick_main")
 st.plotly_chart(close_trend(df), use_container_width=True, key="close_trend")
 st.plotly_chart(volume_chart(df), use_container_width=True, key="volume_chart")
 
